@@ -1,0 +1,271 @@
+\chapter{Task 6: Program Execution and Testing}
+\label{ch:task6}
+
+This chapter provides comprehensive evidence of the Java program execution for Task 6. All stored procedures were tested with multiple runs, demonstrating proper functionality, error handling, and database state changes.
+
+\section{Menu Display}
+
+The application presents an interactive menu with 18 options for database operations.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_options.png}
+\caption{Screenshot of the application menu showing all 18 options}
+\end{figure}
+
+\section{Insert Operations Testing}
+
+\subsection{Query 1: \texttt{sp\_InsertVisitorWithEnrollments}}
+
+This stored procedure inserts a new visitor and enrolls them in programs. Five test runs were performed with different visitor data.
+
+\subsubsection{Test Run 1}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query1_1.png}
+\caption{Query 1 run 1: Inserting visitor with enrollment data}
+\end{figure}
+
+\subsubsection{Test Run 2}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query1_2.png}
+\caption{Query 1 run 2: Inserting visitor with different enrollment}
+\end{figure}
+
+\subsubsection{Test Run 3}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query1_3.png}
+\caption{Query 1 run 3: Inserting visitor without enrollments}
+\end{figure}
+
+\subsubsection{Test Run 4}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query1_4.png}
+\caption{Query 1 run 4: Inserting visitor with newsletter subscription}
+\end{figure}
+
+\subsubsection{Test Run 5}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query1_5.png}
+\caption{Query 1 run 5: Inserting visitor with park pass}
+\end{figure}
+
+\subsubsection{Resulting Table Contents}
+
+The following CSV listings show the state of related tables after all query 1 runs.
+
+\lstinputlisting[caption={Contents of Person table after query 1}, label={lst:person_query1}]{tables_done/person.csv}
+
+\lstinputlisting[caption={Contents of Visitor table after query 1}, label={lst:visitor_query1}]{tables_done/visitor.csv}
+
+\lstinputlisting[caption={Contents of Enrollment table after query 1}, label={lst:enrollment_query1}]{tables_done/enrollment.csv}
+
+\lstinputlisting[caption={Contents of ParkPass table after query 1}, label={lst:parkpass_query1}]{tables_done/parkpass.csv}
+
+\subsection{Query 2: \texttt{sp\_InsertRanger}}
+
+This stored procedure inserts a new ranger into the system. Five test runs were performed.
+
+\subsubsection{Test Run 1}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query2_1.png}
+\caption{Query 2 run 1: Inserting ranger with active status}
+\end{figure}
+
+\subsubsection{Test Run 2}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query2_2.png}
+\caption{Query 2 run 2: Inserting ranger with different start date}
+\end{figure}
+
+\subsubsection{Test Run 3}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query2_3.png}
+\caption{Query 2 run 3: Inserting ranger with on-leave status}
+\end{figure}
+
+\subsubsection{Test Run 4}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query2_4.png}
+\caption{Query 2 run 4: Inserting veteran ranger}
+\end{figure}
+
+\subsubsection{Test Run 5}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query2_5.png}
+\caption{Query 2 run 5: Inserting new hire ranger}
+\end{figure}
+
+\subsubsection{Resulting Table Contents}
+
+\lstinputlisting[caption={Contents of Person table after query 2}, label={lst:person_query2}]{tables_done/person.csv}
+
+\lstinputlisting[caption={Contents of Ranger table after query 2}, label={lst:ranger_query2}]{tables_done/ranger.csv}
+
+\lstinputlisting[caption={Contents of RangerCertification table after query 2}, label={lst:rangercertification_query2}]{tables_done/rangercertification.csv}
+
+\lstinputlisting[caption={Contents of RangerTeamAssignment table after query 2}, label={lst:rangerteamassignment_query2}]{tables_done/rangerteamassignment.csv}
+
+\subsection{Query 3: \texttt{sp\_InsertRangerTeamWithLeader}}
+
+This stored procedure creates a new ranger team with an assigned leader. Five test runs were performed.
+
+\subsubsection{Test Run 1}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query3_1.png}
+\caption{Query 3 run 1: Creating wildlife conservation team}
+\end{figure}
+
+\subsubsection{Test Run 2}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query3_2.png}
+\caption{Query 3 run 2: Creating trail maintenance team}
+\end{figure}
+
+\subsubsection{Test Run 3}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query3_3.png}
+\caption{Query 3 run 3: Creating visitor services team}
+\end{figure}
+
+\subsubsection{Test Run 4}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query3_4.png}
+\caption{Query 3 run 4: Creating emergency response team}
+\end{figure}
+
+\subsubsection{Test Run 5}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query3_5.png}
+\caption{Query 3 run 5: Creating research support team}
+\end{figure}
+
+\subsubsection{Resulting Table Contents}
+
+\lstinputlisting[caption={Contents of RangerTeam table after query 3}, label={lst:rangerteam_query3}]{tables_done/rangerteam.csv}
+
+\lstinputlisting[caption={Contents of RangerTeamAssignment table after query 3}, label={lst:rangerteamassignment_query3}]{tables_done/rangerteamassignment.csv}
+
+\subsection{Query 4: \texttt{sp\_InsertDonation}}
+
+This stored procedure inserts a new donation with payment details. Five test runs were performed with both check and card payments.
+
+\subsubsection{Test Run 1}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query4_1.png}
+\caption{Query 4 run 1: Inserting donation with credit card payment}
+\end{figure}
+
+\subsubsection{Test Run 2}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query4_2.png}
+\caption{Query 4 run 2: Inserting donation with check payment}
+\end{figure}
+
+\subsubsection{Test Run 3}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query4_3.png}
+\caption{Query 4 run 3: Inserting large donation}
+\end{figure}
+
+\subsubsection{Test Run 4}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query4_4.png}
+\caption{Query 4 run 4: Inserting campaign-specific donation}
+\end{figure}
+
+\subsubsection{Test Run 5}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query4_5.png}
+\caption{Query 4 run 5: Inserting anonymous donation}
+\end{figure}
+
+\subsubsection{Resulting Table Contents}
+
+\lstinputlisting[caption={Contents of Donor table after query 4}, label={lst:donor_query4}]{tables_done/donor.csv}
+
+\lstinputlisting[caption={Contents of Donation table after query 4}, label={lst:donation_query4}]{tables_done/donation.csv}
+
+\lstinputlisting[caption={Contents of CheckPayment table after query 4}, label={lst:checkpayment_query4}]{tables_done/checkpayment.csv}
+
+\lstinputlisting[caption={Contents of CreditCardPayment table after query 4}, label={lst:creditcardpayment_query4}]{tables_done/creditcardpayment.csv}
+
+\subsection{Query 5: \texttt{sp\_InsertResearcher}}
+
+This stored procedure inserts a new researcher into the system. Five test runs were performed.
+
+\subsubsection{Test Run 1}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query5_1.png}
+\caption{Query 5 run 1: Inserting wildlife biologist}
+\end{figure}
+
+\subsubsection{Test Run 2}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query5_2.png}
+\caption{Query 5 run 2: Inserting environmental scientist}
+\end{figure}
+
+\subsubsection{Test Run 3}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query5_3.png}
+\caption{Query 5 run 3: Inserting geologist}
+\end{figure}
+
+\subsubsection{Test Run 4}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query5_4.png}
+\caption{Query 5 run 4: Inserting botanist}
+\end{figure}
+
+\subsubsection{Test Run 5}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{screenshots/task6_query5_5.png}
+\caption{Query 5 run 5: Inserting senior researcher}
+\end{figure}
+
+\subsubsection{Resulting Table Contents}
+
+\lstinputlisting[caption={Contents of Person table after query 5}, label={lst:person_query5}]{tables_done/person.csv}
+
+\lstinputlisting[caption={Contents of Researcher table after query 5}, label={lst:researcher_query5}]{tables_done/researcher.csv}
+
+\lstinputlisting[caption={Contents of RangerTeamOverseen table after query 5}, label={lst:rangerteamoverseen_query5}]{tables_done/rangerteamoverseen.csv}
+
+\section{Summary of Insert Operations}
+
+All five insert operations (queries 1-5) were successfully tested with multiple runs each, demonstrating:
+
+\begin{itemize}
+    \item Proper parameter passing from Java to stored procedures
+    \item Successful insertion of records into multiple related tables
+    \item Maintenance of referential integrity through foreign keys
+    \item Automatic export of all tables after each operation
+    \item Idempotent behavior where appropriate (preventing duplicate inserts)
+\end{itemize}
+
+The CSV table listings show the cumulative effect of all test runs, with data properly distributed across the normalized table structure.

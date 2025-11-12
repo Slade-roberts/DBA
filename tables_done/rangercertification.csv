@@ -1,0 +1,11 @@
+RangerID,Certification
+frng1,First Aid
+FRNG100,CPR
+FRNG100,First Aid
+FRNG101,CPR
+FRNG101,Wildlife Handling
+FRNG102,Search and Rescue
+FRNG102,Wildlife Handling
+FRNG103,Firefighting
+FRNG103,Search and Rescue
+MISSING_RANGER,Firefighting

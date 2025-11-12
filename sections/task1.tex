@@ -1,0 +1,26 @@
+\chapter{Task 1: ER Diagram for NPSS Database}
+
+The goal of this task was to make an ER diagram for the NPSS (National Park Support System) database.  
+The diagram shows all of the main parts of the system, how they connect, and the important information stored about each one.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{screenshots/er-diagram.png}
+    \caption{ER Diagram for the NPSS Database}
+\end{figure}
+
+The ER diagram includes people, visitors, rangers, researchers, and national parks.  
+It also shows programs, teams, projects, and donations.  
+Each line between the boxes represents a relationship between entities, such as which ranger is part of a team or which visitor joins a program.
+
+Some notes about the design:
+\begin{itemize}
+    \item People can have multiple phone numbers and emails.
+    \item Rangers can be assigned to teams and can have many certifications.
+    \item Researchers oversee ranger teams and write reports.
+    \item Visitors can enroll in different park programs.
+    \item Donations can be made by donors using checks or credit cards.
+\end{itemize}
+
+Overall, the ER diagram shows how the NPSS database keeps track of all the people, parks, and activities in one connected system.
+

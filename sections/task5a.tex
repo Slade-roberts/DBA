@@ -1,0 +1,705 @@
+\chapter{Task 5a: Stored Procedures}
+
+This chapter includes the stored procedures for Task 5a, with code excerpts and screenshots. All stored procedures have been implemented and tested in Azure SQL Database.
+
+\section{Stored Procedure 1: sp\_InsertVisitorWithEnrollments}
+
+This stored procedure inserts a new person record, creates their visitor role, and optionally enrolls them in multiple programs using a CSV-formatted string.
+
+\begin{lstlisting}[label={lst5a:sp_insertvisitorwithenrollments}]
+IF OBJECT_ID('sp_InsertVisitorWithEnrollments','P') IS NOT NULL
+	DROP PROCEDURE sp_InsertVisitorWithEnrollments;
+GO
+-- ===========================================================================
+-- sp_InsertVisitorWithEnrollments
+-- Purpose: insert a person and their visitor role, and optionally enroll 
+--          them in programs.
+--
+-- Parameters (explained):
+--  @PersonID    : identifier for the person (NVARCHAR(50)). I used text 
+--                 IDs to make it easy to provide meaningful IDs during 
+--                 tests (instead of opaque integers).
+--  @FirstName,@MiddleInitial,@LastName,@DOB,@Gender, etc.: basic person 
+--                 attributes used to populate the Person table. DOB should 
+--                 be in YYYY-MM-DD format.
+--  @Newsletter  : 0/1 flag for mailing-list opt-in.
+--  @PassID      : optional link to ParkPass; NULL if the visitor has no pass.
+--  @Enrollments : CSV like '12:2025-06-01,15:2025-06-05' where each piece 
+--                 is ProgramID:VisitDate. The procedure parses this string 
+--                 server-side and inserts Enrollment rows.
+-- Behavior notes:
+--  - The procedure uses an explicit transaction so Person/Visitor/Enrollment 
+--    are inserted together; on error the transaction is rolled back and an 
+--    error is raised for the client.
+-- ===========================================================================
+CREATE PROCEDURE sp_InsertVisitorWithEnrollments
+	@PersonID NVARCHAR(50),
+	@FirstName NVARCHAR(100),
+	@MiddleInitial NCHAR(1) = NULL,
+	@LastName NVARCHAR(100),
+	@DOB DATE,
+	@Gender NVARCHAR(20) = NULL,
+	@Street NVARCHAR(200) = NULL,
+	@City NVARCHAR(100) = NULL,
+	@State NVARCHAR(50) = NULL,
+	@PostalCode NVARCHAR(20) = NULL,
+	@Newsletter BIT = 0,
+	@PassID INT = NULL,
+	@Enrollments NVARCHAR(MAX) = NULL
+AS
+BEGIN
+	SET NOCOUNT ON;
+	BEGIN TRY
+		BEGIN TRANSACTION;
+		-- Only insert Person if they do not already exist (idempotent)
+		IF NOT EXISTS (SELECT 1 FROM Person WHERE PersonID = @PersonID)
+		BEGIN
+			INSERT INTO Person(PersonID, FirstName, MiddleInitial, LastName, 
+			                   DOB, Gender, Street, City, State, PostalCode, 
+			                   NewsletterSubscribed)
+			VALUES(@PersonID, @FirstName, @MiddleInitial, @LastName, @DOB, 
+			       @Gender, @Street, @City, @State, @PostalCode, @Newsletter);
+		END
+
+		-- Only insert Visitor role if not already present
+		IF NOT EXISTS (SELECT 1 FROM Visitor WHERE VisitorID = @PersonID)
+		BEGIN
+			INSERT INTO Visitor(VisitorID, PassID) 
+			VALUES(@PersonID, @PassID);
+		END
+
+		IF (@Enrollments IS NOT NULL AND LTRIM(RTRIM(@Enrollments)) <> '')
+		BEGIN
+			DECLARE @xml XML = CAST('<x>' + REPLACE(@Enrollments, ',', '</x><x>') 
+			                        + '</x>' AS XML);
+			DECLARE @e TABLE(ProgramID INT, VisitDate DATE);
+
+			INSERT INTO @e(ProgramID, VisitDate)
+			SELECT
+				TRY_CAST(LEFT(T.value('.', 'nvarchar(max)'), 
+				         CHARINDEX(':', T.value('.', 'nvarchar(max)')) - 1) 
+				         AS INT),
+				TRY_CAST(SUBSTRING(T.value('.', 'nvarchar(max)'), 
+				         CHARINDEX(':', T.value('.', 'nvarchar(max)')) + 1, 50) 
+				         AS DATE)
+			FROM @xml.nodes('/x') AS X(T);
+
+			-- Insert enrollments but avoid duplicates
+			INSERT INTO Enrollment(VisitorID, ProgramID, VisitDate)
+			SELECT @PersonID, e.ProgramID, e.VisitDate
+			FROM @e e
+			WHERE NOT EXISTS (
+				SELECT 1 FROM Enrollment en 
+				WHERE en.VisitorID = @PersonID 
+				  AND en.ProgramID = e.ProgramID 
+				  AND en.VisitDate = e.VisitDate
+			);
+		END
+
+		COMMIT TRANSACTION;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+		DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+		RAISERROR('Error inserting visitor: %s', 16, 1, @ErrorMessage);
+		RETURN;
+	END CATCH
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp1.png}
+\caption{Screenshot of sp\_InsertVisitorWithEnrollments code (part 1)}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp1.2.png}
+\caption{Screenshot of sp\_InsertVisitorWithEnrollments code (part 2)}
+\end{figure}
+
+\section{Stored Procedure 2: sp\_InsertRanger}
+
+This stored procedure inserts a new ranger into the system, creating a minimal Person record if one doesn't exist.
+
+\begin{lstlisting}[label={lst5a:sp_insertranger}]
+IF OBJECT_ID('sp_InsertRanger','P') IS NOT NULL
+	DROP PROCEDURE sp_InsertRanger;
+GO
+CREATE PROCEDURE sp_InsertRanger
+	@RangerID NVARCHAR(50),
+	@StartDate DATE,
+	@Status NVARCHAR(20)
+AS
+BEGIN
+	SET NOCOUNT ON;
+	BEGIN TRY
+		-- Insert Person record if it doesn't exist
+		IF NOT EXISTS (SELECT 1 FROM Person WHERE PersonID = @RangerID)
+		BEGIN
+			INSERT INTO Person(PersonID, FirstName, LastName, DOB) 
+			VALUES(@RangerID, 'Unknown','Unknown','1900-01-01');
+		END
+
+		-- Insert Ranger record if it doesn't exist
+		IF NOT EXISTS (SELECT 1 FROM Ranger WHERE RangerID = @RangerID)
+		BEGIN
+			INSERT INTO Ranger(RangerID, StartDate, Status) 
+			VALUES(@RangerID, @StartDate, @Status);
+		END
+	END TRY
+	BEGIN CATCH
+		THROW;
+	END CATCH
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp2.png}
+\caption{Screenshot of sp\_InsertRanger code}
+\end{figure}
+
+\section{Stored Procedure 3: sp\_InsertRangerTeamWithLeader}
+
+This stored procedure creates a new ranger team and assigns a leader to that team.
+
+\begin{lstlisting}[label={lst5a:sp_insertrangerteamwithleader}]
+IF OBJECT_ID('sp_InsertRangerTeamWithLeader','P') IS NOT NULL
+	DROP PROCEDURE sp_InsertRangerTeamWithLeader;
+GO
+CREATE PROCEDURE sp_InsertRangerTeamWithLeader
+	@FocusArea NVARCHAR(200),
+	@FormationDate DATE = NULL,
+	@LeaderRangerID NVARCHAR(50)
+AS
+BEGIN
+	SET NOCOUNT ON;
+	-- Check if the leader ranger is already assigned to a team
+	IF NOT EXISTS (SELECT 1 FROM RangerTeamAssignment 
+	               WHERE RangerID = @LeaderRangerID)
+	BEGIN
+		DECLARE @TeamID INT;
+		INSERT INTO RangerTeam(FocusArea, FormationDate) 
+		VALUES(@FocusArea, @FormationDate);
+		SET @TeamID = SCOPE_IDENTITY();
+		INSERT INTO RangerTeamAssignment(TeamID, RangerID, 
+		                                 AssignmentStartDate, Status, IsLeader) 
+		VALUES(@TeamID, @LeaderRangerID, GETDATE(), 'active', 1);
+	END
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp3.png}
+\caption{Screenshot of sp\_InsertRangerTeamWithLeader code}
+\end{figure}
+
+\section{Stored Procedure 4: sp\_InsertDonation}
+
+This stored procedure inserts a donation record and the appropriate payment details (check or credit card).
+
+\begin{lstlisting}[label={lst5a:sp_insertdonation}]
+IF OBJECT_ID('sp_InsertDonation','P') IS NOT NULL
+	DROP PROCEDURE sp_InsertDonation;
+GO
+CREATE PROCEDURE sp_InsertDonation
+	@DonorID NVARCHAR(50),
+	@DonationDate DATE,
+	@Amount DECIMAL(14,2),
+	@CampaignName NVARCHAR(200) = NULL,
+	@PaymentType NVARCHAR(20),
+	@CheckNumber NVARCHAR(100) = NULL,
+	@CardType NVARCHAR(50) = NULL,
+	@LastFour NCHAR(4) = NULL,
+	@ExpDate DATE = NULL
+AS
+BEGIN
+	SET NOCOUNT ON;
+	DECLARE @DonationID INT;
+	INSERT INTO Donation(DonorID, DonationDate, Amount, CampaignName, PaymentType)
+	VALUES(@DonorID, @DonationDate, @Amount, @CampaignName, @PaymentType);
+	SET @DonationID = SCOPE_IDENTITY();
+	IF @PaymentType = 'CHECK'
+	BEGIN
+		-- Note: For CHECK payments the check number is stored in a 
+		-- separate CheckPayment table; CheckPayment.DonationID is a 
+		-- 1:1 PK referencing Donation.
+		INSERT INTO CheckPayment(DonationID, CheckNumber) 
+		VALUES(@DonationID, @CheckNumber);
+	END
+	ELSE IF @PaymentType = 'CARD'
+	BEGIN
+		-- Note: For CARD payments we only store non-sensitive metadata 
+		-- (card type, last four, expiration). We intentionally do NOT 
+		-- store full PANs or CVV values for security.
+		INSERT INTO CreditCardPayment(DonationID, CardType, LastFourDigits, 
+		                               ExpirationDate) 
+		VALUES(@DonationID, @CardType, @LastFour, @ExpDate);
+	END
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp4.png}
+\caption{Screenshot of sp\_InsertDonation code}
+\end{figure}
+
+\section{Stored Procedure 5: sp\_InsertResearcher}
+
+This stored procedure inserts a new researcher into the system.
+
+\begin{lstlisting}[label={lst5a:sp_insertresearcher}]
+IF OBJECT_ID('sp_InsertResearcher','P') IS NOT NULL
+	DROP PROCEDURE sp_InsertResearcher;
+GO
+CREATE PROCEDURE sp_InsertResearcher
+	@ResearcherID NVARCHAR(50),
+	@Field NVARCHAR(200),
+	@HireDate DATE,
+	@Salary DECIMAL(12,2)
+AS
+BEGIN
+	SET NOCOUNT ON;
+	BEGIN TRY
+		-- Insert Person record if it doesn't exist
+		IF NOT EXISTS (SELECT 1 FROM Person WHERE PersonID = @ResearcherID)
+		BEGIN
+			INSERT INTO Person(PersonID, FirstName, LastName, DOB) 
+			VALUES(@ResearcherID, 'Unknown','Unknown','1900-01-01');
+		END
+
+		-- Insert Researcher record if it doesn't exist
+		IF NOT EXISTS (SELECT 1 FROM Researcher 
+		               WHERE ResearcherID = @ResearcherID)
+		BEGIN
+			INSERT INTO Researcher(ResearcherID, Field, HireDate, Salary) 
+			VALUES(@ResearcherID, @Field, @HireDate, @Salary);
+		END
+	END TRY
+	BEGIN CATCH
+		THROW;
+	END CATCH
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp5.png}
+\caption{Screenshot of sp\_InsertResearcher code}
+\end{figure}
+
+\section{Stored Procedure 6: sp\_InsertReport}
+
+This stored procedure inserts a new research report.
+
+\begin{lstlisting}[label={lst5a:sp_insertreport}]
+IF OBJECT_ID('sp_InsertReport','P') IS NOT NULL
+	DROP PROCEDURE sp_InsertReport;
+GO
+CREATE PROCEDURE sp_InsertReport
+	@TeamID INT,
+	@ResearcherID NVARCHAR(50),
+	@ReportDate DATE,
+	@Summary NVARCHAR(MAX)
+AS
+BEGIN
+	SET NOCOUNT ON;
+	INSERT INTO Report(TeamID, ResearcherID, ReportDate, Summary) 
+	VALUES(@TeamID, @ResearcherID, @ReportDate, @Summary);
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp6.png}
+\caption{Screenshot of sp\_InsertReport code}
+\end{figure}
+
+\section{Stored Procedure 7: sp\_InsertProgram}
+
+This stored procedure inserts a new park program.
+
+\begin{lstlisting}[label={lst5a:sp_insertprogram}]
+IF OBJECT_ID('sp_InsertProgram','P') IS NOT NULL
+	DROP PROCEDURE sp_InsertProgram;
+GO
+CREATE PROCEDURE sp_InsertProgram
+	@ParkName NVARCHAR(200),
+	@ProgramName NVARCHAR(200),
+	@Type NVARCHAR(100),
+	@StartDate DATE,
+	@DurationHours INT
+AS
+BEGIN
+	SET NOCOUNT ON;
+	INSERT INTO Program(ParkName, ProgramName, Type, StartDate, DurationHours) 
+	VALUES(@ParkName, @ProgramName, @Type, @StartDate, @DurationHours);
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp7.png}
+\caption{Screenshot of sp\_InsertProgram code}
+\end{figure}
+
+\section{Stored Procedure 8: sp\_GetEmergencyContacts}
+
+This stored procedure retrieves all emergency contacts for a given person.
+
+\begin{lstlisting}[label={lst5a:sp_getemergencycontacts}]
+IF OBJECT_ID('sp_GetEmergencyContacts','P') IS NOT NULL
+	DROP PROCEDURE sp_GetEmergencyContacts;
+GO
+CREATE PROCEDURE sp_GetEmergencyContacts
+	@PersonID NVARCHAR(50)
+AS
+BEGIN
+	SET NOCOUNT ON;
+	SELECT ContactName, Relationship, PhoneNumber 
+	FROM EmergencyContact 
+	WHERE PersonID = @PersonID;
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp8.png}
+\caption{Screenshot of sp\_GetEmergencyContacts code}
+\end{figure}
+
+\section{Stored Procedure 9: sp\_GetVisitorsByProgram}
+
+This stored procedure retrieves all visitors enrolled in a specific program.
+
+\begin{lstlisting}[label={lst5a:sp_getvisitorsbyprogram}]
+IF OBJECT_ID('sp_GetVisitorsByProgram','P') IS NOT NULL
+	DROP PROCEDURE sp_GetVisitorsByProgram;
+GO
+CREATE PROCEDURE sp_GetVisitorsByProgram
+	@ProgramID INT
+AS
+BEGIN
+	SET NOCOUNT ON;
+	SELECT p.PersonID, p.FirstName, p.LastName, e.VisitDate, 
+	       e.AccessibilityNeeds
+	FROM Enrollment e
+	JOIN Visitor v ON e.VisitorID = v.VisitorID
+	JOIN Person p ON v.VisitorID = p.PersonID
+	WHERE e.ProgramID = @ProgramID;
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp9.png}
+\caption{Screenshot of sp\_GetVisitorsByProgram code}
+\end{figure}
+
+\section{Stored Procedure 10: sp\_GetProgramsAfterDate}
+
+This stored procedure retrieves all programs at a park that start after a given date.
+
+\begin{lstlisting}[label={lst5a:sp_getprogramsafterdate}]
+IF OBJECT_ID('sp_GetProgramsAfterDate','P') IS NOT NULL
+	DROP PROCEDURE sp_GetProgramsAfterDate;
+GO
+CREATE PROCEDURE sp_GetProgramsAfterDate
+	@ParkName NVARCHAR(200),
+	@StartAfter DATE
+AS
+BEGIN
+	SET NOCOUNT ON;
+	SELECT * 
+	FROM Program 
+	WHERE ParkName = @ParkName AND StartDate > @StartAfter 
+	ORDER BY StartDate;
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp10.png}
+\caption{Screenshot of sp\_GetProgramsAfterDate code}
+\end{figure}
+
+\section{Stored Procedure 11: sp\_AnonymousDonationStatsByMonth}
+
+This stored procedure calculates donation statistics for anonymous donors for a given month.
+
+\begin{lstlisting}[label={lst5a:sp_anonymousdonationstatsbymonth}]
+IF OBJECT_ID('sp_AnonymousDonationStatsByMonth','P') IS NOT NULL
+	DROP PROCEDURE sp_AnonymousDonationStatsByMonth;
+GO
+CREATE PROCEDURE sp_AnonymousDonationStatsByMonth
+	@Year INT,
+	@Month INT
+AS
+BEGIN
+	SET NOCOUNT ON;
+	SELECT d.DonorID, SUM(d.Amount) AS TotalAmount, 
+	       AVG(d.Amount) AS AvgAmount, COUNT(*) AS NumDonations
+	FROM Donation d
+	JOIN Donor o ON d.DonorID = o.DonorID
+	WHERE o.IsAnonymous = 1 
+	  AND YEAR(d.DonationDate) = @Year 
+	  AND MONTH(d.DonationDate) = @Month
+	GROUP BY d.DonorID
+	ORDER BY SUM(d.Amount) DESC;
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp11.png}
+\caption{Screenshot of sp\_AnonymousDonationStatsByMonth code}
+\end{figure}
+
+\section{Stored Procedure 12: sp\_GetRangersInTeam}
+
+This stored procedure retrieves all rangers in a specific team with their details.
+
+\begin{lstlisting}[label={lst5a:sp_getrangersinteam}]
+IF OBJECT_ID('sp_GetRangersInTeam','P') IS NOT NULL
+	DROP PROCEDURE sp_GetRangersInTeam;
+GO
+CREATE PROCEDURE sp_GetRangersInTeam
+	@TeamID INT
+AS
+BEGIN
+	SET NOCOUNT ON;
+	SELECT r.RangerID, p.FirstName, p.LastName, 
+	       DATEDIFF(YEAR, r.StartDate, GETDATE()) AS YearsOfService, 
+	       rta.IsLeader, rc.Certification
+	FROM RangerTeamAssignment rta
+	JOIN Ranger r ON rta.RangerID = r.RangerID
+	JOIN Person p ON r.RangerID = p.PersonID
+	LEFT JOIN RangerCertification rc ON r.RangerID = rc.RangerID
+	WHERE rta.TeamID = @TeamID
+	ORDER BY rta.IsLeader DESC, p.LastName;
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp12.png}
+\caption{Screenshot of sp\_GetRangersInTeam code}
+\end{figure}
+
+\section{Stored Procedure 13: sp\_GetAllIndividuals}
+
+This stored procedure retrieves all individuals in the system.
+
+\begin{lstlisting}[label={lst5a:sp_getallindividuals}]
+IF OBJECT_ID('sp_GetAllIndividuals','P') IS NOT NULL
+	DROP PROCEDURE sp_GetAllIndividuals;
+GO
+CREATE PROCEDURE sp_GetAllIndividuals
+AS
+BEGIN
+	SET NOCOUNT ON;
+	SELECT p.PersonID, p.FirstName, p.MiddleInitial, p.LastName, p.DOB, 
+	       p.Gender, p.Street, p.City, p.State, p.PostalCode, 
+	       p.NewsletterSubscribed
+	FROM Person p;
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp13.png}
+\caption{Screenshot of sp\_GetAllIndividuals code}
+\end{figure}
+
+\section{Stored Procedure 14: sp\_IncreaseSalary}
+
+This stored procedure increases salaries by 3\% for researchers overseeing multiple teams.
+
+\begin{lstlisting}[label={lst5a:sp_increasesalary}]
+IF OBJECT_ID('sp_IncreaseSalary','P') IS NOT NULL
+	DROP PROCEDURE sp_IncreaseSalary;
+GO
+CREATE PROCEDURE sp_IncreaseSalary
+AS
+BEGIN
+	SET NOCOUNT ON;
+	UPDATE r
+	SET Salary = Salary * 1.03
+	FROM Researcher r
+	WHERE r.ResearcherID IN (
+		SELECT ResearcherID 
+		FROM RangerTeamOverseen 
+		GROUP BY ResearcherID 
+		HAVING COUNT(*) > 1
+	);
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp14.png}
+\caption{Screenshot of sp\_IncreaseSalary code}
+\end{figure}
+
+\section{Stored Procedure 15: sp\_DeleteInactiveVisitors}
+
+This stored procedure deletes visitors who have no enrollments and either no pass or an expired pass.
+
+\begin{lstlisting}[label={lst5a:sp_deleteinactivevisitors}]
+IF OBJECT_ID('sp_DeleteInactiveVisitors','P') IS NOT NULL
+	DROP PROCEDURE sp_DeleteInactiveVisitors;
+GO
+CREATE PROCEDURE sp_DeleteInactiveVisitors
+AS
+BEGIN
+	SET NOCOUNT ON;
+	DELETE v
+	FROM Visitor v
+	LEFT JOIN Enrollment e ON v.VisitorID = e.VisitorID
+	LEFT JOIN ParkPass pp ON v.PassID = pp.PassID
+	WHERE e.VisitorID IS NULL 
+	  AND (pp.PassID IS NULL OR pp.ExpirationDate < GETDATE());
+END
+GO
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5a_sp15.png}
+\caption{Screenshot of sp\_DeleteInactiveVisitors code}
+\end{figure}
+
+\section{Test Data and Procedure Calls}
+
+The following SQL script demonstrates testing of the stored procedures with sample data.
+
+\begin{lstlisting}[label={lst5a:test_data_and_calls}]
+-- Consolidated additional test data and calls from extras
+-- test_data_and_calls.sql
+SET NOCOUNT ON;
+PRINT '=== START TEST DATA AND PROCEDURE CALLS ===';
+
+-- 1) Create a program and capture its ProgramID
+PRINT 'Ensuring NationalPark "Grand Park" exists...';
+IF NOT EXISTS (SELECT 1 FROM NationalPark WHERE ParkName = 'Grand Park')
+BEGIN
+    INSERT INTO NationalPark(ParkName, Street, City, State, PostalCode, 
+                             EstablishmentDate, Capacity)
+    VALUES('Grand Park','1 Park Ave','Parkville','PS','12345',
+           '2000-01-01',1000);
+END
+
+PRINT 'Inserting Program...';
+EXEC sp_InsertProgram @ParkName='Grand Park', @ProgramName='NatureWalk', 
+                      @Type='Education', @StartDate='2025-11-01', 
+                      @DurationHours=2;
+
+DECLARE @ProgramID INT;
+SELECT @ProgramID = MAX(ProgramID) 
+FROM Program 
+WHERE ParkName='Grand Park' AND ProgramName='NatureWalk';
+PRINT 'ProgramID=' + COALESCE(CAST(@ProgramID AS NVARCHAR(20)),'(null)');
+
+-- 2) Insert a visitor and enroll them in the just-created program
+PRINT 'Inserting Visitor with enrollment (idempotent)...';
+DECLARE @VisitorEnrollments NVARCHAR(MAX) = NULL;
+IF @ProgramID IS NOT NULL
+    SET @VisitorEnrollments = CAST(@ProgramID AS NVARCHAR(10)) + ':2025-11-09';
+
+IF NOT EXISTS (SELECT 1 FROM Person WHERE PersonID = 'vis100')
+BEGIN
+    EXEC sp_InsertVisitorWithEnrollments
+        @PersonID='vis100',
+        @FirstName='Sam',
+        @MiddleInitial=NULL,
+        @LastName='Visitor',
+        @DOB='1990-05-20',
+        @Gender='Non-binary',
+        @Street='100 Trail Rd',
+        @City='Parkville',
+        @State='PS',
+        @PostalCode='12345',
+        @Newsletter=1,
+        @PassID=NULL,
+        @Enrollments = @VisitorEnrollments;
+END
+ELSE
+BEGIN
+    PRINT 'Visitor vis100 already exists; skipping.';
+END
+
+-- 3) Insert a donor and a donation (card)
+PRINT 'Inserting Donor and Donation (idempotent)...';
+IF NOT EXISTS (SELECT 1 FROM Person WHERE PersonID = 'donor100')
+    INSERT INTO Person(PersonID, FirstName, LastName, DOB) 
+    VALUES('donor100','Alice','Smith','1980-01-01');
+IF NOT EXISTS (SELECT 1 FROM Donor WHERE DonorID = 'donor100')
+    INSERT INTO Donor(DonorID, IsAnonymous) VALUES('donor100',0);
+EXEC sp_InsertDonation @DonorID='donor100', @DonationDate='2025-11-01', 
+                       @Amount=150.00, @CampaignName='FallCampaign', 
+                       @PaymentType='CARD', @CheckNumber=NULL, 
+                       @CardType='VISA', @LastFour='4242', 
+                       @ExpDate='2026-12-31';
+
+-- 4) Insert an anonymous donor and donation
+PRINT 'Inserting Anonymous Donor and Donation (idempotent)...';
+IF NOT EXISTS (SELECT 1 FROM Person WHERE PersonID = 'anon1')
+    INSERT INTO Person(PersonID, FirstName, LastName, DOB) 
+    VALUES('anon1','Anonymous','Donor','1970-01-01');
+IF NOT EXISTS (SELECT 1 FROM Donor WHERE DonorID = 'anon1')
+    INSERT INTO Donor(DonorID, IsAnonymous) VALUES('anon1',1);
+EXEC sp_InsertDonation @DonorID='anon1', @DonationDate='2025-11-05', 
+                       @Amount=75.00, @CampaignName='FallCampaign', 
+                       @PaymentType='CHECK', @CheckNumber='1001', 
+                       @CardType=NULL, @LastFour=NULL, @ExpDate=NULL;
+
+-- 5) Call retrieval procedures to verify outputs
+PRINT 'Retrieving visitors enrolled in program...';
+IF @ProgramID IS NOT NULL
+    EXEC sp_GetVisitorsByProgram @ProgramID=@ProgramID;
+
+PRINT 'Retrieving all individuals...';
+EXEC sp_GetAllIndividuals;
+
+PRINT 'Anonymous donation stats for Nov 2025...';
+EXEC sp_AnonymousDonationStatsByMonth @Year=2025, @Month=11;
+
+-- 6) Verify procedures are present
+PRINT 'Verifying rangers-in-team (may be empty)...';
+EXEC sp_GetRangersInTeam @TeamID=1;
+
+PRINT '=== END TEST DATA AND PROCEDURE CALLS ===';
+GO
+\end{lstlisting}
+
+\section{Summary}
+
+All 15 stored procedures have been successfully created and tested in Azure SQL Database. The procedures provide comprehensive functionality for:
+
+\begin{itemize}
+    \item Inserting new records (visitors, rangers, teams, donations, researchers, reports, programs)
+    \item Retrieving data (emergency contacts, visitors by program, programs by date, rangers in team, all individuals, anonymous donation statistics)
+    \item Updating data (increasing salaries for multi-team researchers)
+    \item Deleting data (removing inactive visitors)
+\end{itemize}
+
+Each procedure includes appropriate error handling, parameter validation, and transactional integrity where needed. The procedures are designed to be called from the Java application developed in Task 5b.

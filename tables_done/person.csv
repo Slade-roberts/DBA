@@ -1,0 +1,21 @@
+PersonID,FirstName,MiddleInitial,LastName,DOB,Gender,Street,City,State,PostalCode,NewsletterSubscribed
+anon1,Anonymous,,Donor,1970-01-01,,,,,,false
+don_extra10,ExtraDonor10,,Extra,1980-01-01,,,,,,false
+don_extra6,ExtraDonor6,,Extra,1980-01-01,,,,,,false
+don_extra7,ExtraDonor7,,Extra,1980-01-01,,,,,,false
+don_extra8,ExtraDonor8,,Extra,1980-01-01,,,,,,false
+don_extra9,ExtraDonor9,,Extra,1980-01-01,,,,,,false
+DON001,Patricia,H,Taylor,1965-03-12,Female,50 Donor St,Scottsdale,AZ,85251,true
+DON002,Daniel,C,Anderson,1970-08-30,Male,60 Donor Ave,Park City,UT,84060,true
+DON100,Donor,,One,1980-01-01,,,,,,false
+DON101,Donor,,Two,1981-01-01,,,,,,false
+DON102,Donor,,Three,1982-01-01,,,,,,false
+DON103,Donor,,Four,1983-01-01,,,,,,false
+DON104,Donor,,Five,1984-01-01,,,,,,false
+donor1,Michael,,Taylor,1965-03-12,,,,,,true
+donor10,James,,White,1975-02-14,,,,,,true
+donor100,Alice,,Smith,1980-01-01,,,,,,false
+donor2,Sarah,,Anderson,1970-08-30,,,,,,false
+donor3,David,,Thomas,1985-06-18,,,,,,true
+donor4,Laura,,Jackson,1990-11-22,,,,,,false
+donor5,James,,White,1975-02-14,,,,,,true

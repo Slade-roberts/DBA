@@ -1,0 +1,147 @@
+\chapter{Task 3: Storage Structures Analysis}
+
+In this task, I reviewed how data is stored in the NPSS database and what indexes would help make it faster.  
+Each stored procedure from Task 5a uses certain tables and columns more often, so I listed indexes that would help improve performance.
+
+\section*{3.1 Query Specific Storage Structures}
+
+\textbf{sp\_InsertVisitorWithEnrollments}
+\begin{itemize}
+    \item Adds a new visitor and enrollments
+    \item Uses Person, Visitor, and Enrollment tables
+    \item Clustered index on Person.PersonID
+    \item Non-clustered index on Enrollment.ProgramID
+\end{itemize}
+
+\textbf{sp\_InsertRangerAndAssign}
+\begin{itemize}
+    \item Adds a new ranger and assigns them to a team
+    \item Uses Ranger and RangerTeamAssignment tables
+    \item Clustered index on Ranger.RangerID
+    \item Non-clustered index on RangerTeamAssignment.TeamID
+\end{itemize}
+
+\textbf{sp\_InsertRangerTeamWithLeader}
+\begin{itemize}
+    \item Creates a new team with a leader
+    \item Uses RangerTeam and RangerTeamAssignment tables
+    \item Clustered index on RangerTeam.TeamID
+    \item Unique index on RangerTeam.FocusArea
+    \item Non-clustered index on RangerTeamAssignment.RangerID
+\end{itemize}
+
+\textbf{sp\_InsertDonation}
+\begin{itemize}
+    \item Adds a donation
+    \item Uses Donation table
+    \item Clustered index on Donation.DonationID
+    \item Non-clustered index on Donation.DonorID
+\end{itemize}
+
+\textbf{sp\_InsertResearcherWithTeams}
+\begin{itemize}
+    \item Adds a researcher and connects them to teams
+    \item Uses Researcher and ResearcherTeam tables
+    \item Clustered index on Researcher.ResearcherID
+    \item Non-clustered index on ResearcherTeam.TeamID
+\end{itemize}
+
+\textbf{sp\_InsertReport}
+\begin{itemize}
+    \item Adds a research report
+    \item Uses Report table
+    \item Clustered index on Report.ReportID
+    \item Non-clustered index on Report.TeamID and Report.ResearcherID
+\end{itemize}
+
+\textbf{sp\_InsertProgram}
+\begin{itemize}
+    \item Adds a park program
+    \item Uses Program table
+    \item Clustered index on Program.ProgramID
+    \item Non-clustered index on Program.ParkName
+\end{itemize}
+
+\textbf{sp\_GetEmergencyContacts}
+\begin{itemize}
+    \item Gets emergency contacts for a person
+    \item Uses EmergencyContact table
+    \item Clustered index on EmergencyContact.PersonID
+\end{itemize}
+
+\textbf{sp\_GetVisitorsByProgram}
+\begin{itemize}
+    \item Lists visitors in a program
+    \item Uses Visitor and Enrollment tables
+    \item Non-clustered index on Enrollment.ProgramID
+    \item Covering index on Enrollment (ProgramID, PersonID)
+\end{itemize}
+
+\textbf{sp\_GetProgramsAfterDate}
+\begin{itemize}
+    \item Shows programs after a certain date
+    \item Uses Program table
+    \item Non-clustered index on Program (ParkName, StartDate)
+\end{itemize}
+
+\textbf{sp\_AnonymousDonationStatsByMonth}
+\begin{itemize}
+    \item Finds anonymous donations by month
+    \item Uses Donation table
+    \item Filtered index on Donation (DonationDate) where DonorID is null
+\end{itemize}
+
+\textbf{sp\_GetRangersInTeam}
+\begin{itemize}
+    \item Lists rangers in a team
+    \item Uses RangerTeamAssignment table
+    \item Non-clustered index on RangerTeamAssignment.TeamID
+\end{itemize}
+
+\textbf{sp\_GetAllIndividuals}
+\begin{itemize}
+    \item Lists all people subscribed to the newsletter
+    \item Uses Person table
+    \item Filtered index on Person.NewsletterSubscribed where value is 1
+\end{itemize}
+
+\textbf{sp\_IncreaseSalaryMultiTeamResearchers}
+\begin{itemize}
+    \item Increases salary for researchers on more than one team
+    \item Uses Researcher and ResearcherTeam tables
+    \item Non-clustered index on ResearcherTeam.ResearcherID
+\end{itemize}
+
+\textbf{sp\_DeleteInactiveVisitors}
+\begin{itemize}
+    \item Deletes visitors not enrolled in any program
+    \item Uses Visitor and Enrollment tables
+    \item Non-clustered index on Enrollment.PersonID
+\end{itemize}
+
+\section*{3.2 General Storage Structures for NPSS}
+
+These are general storage ideas to help the NPSS database work better in Azure SQL.
+
+\textbf{Main Storage Ideas}
+\begin{itemize}
+    \item Clustered indexes on primary keys like PersonID and TeamID
+    \item Non-clustered indexes on foreign keys for faster joins
+    \item Composite indexes on common joins like Enrollment (ProgramID, PersonID)
+\end{itemize}
+
+\textbf{Extra Features in Azure SQL}
+\begin{itemize}
+    \item Partition large tables like Donation or Report by date
+    \item Use columnstore indexes for reports and summaries
+    \item Use filtered indexes for specific searches, like NewsletterSubscribed = 1
+    \item Add full-text indexes for text searches, like Report.Summary
+\end{itemize}
+
+\textbf{Why These Help}
+\begin{itemize}
+    \item Clustered and non-clustered indexes make searching and inserting faster
+    \item Partitioning keeps large tables organized and easier to maintain
+    \item Columnstore indexes make reports and summaries faster
+    \item Filtered and full-text indexes save space and help special searches
+\end{itemize}

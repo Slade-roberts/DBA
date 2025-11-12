@@ -1,0 +1,405 @@
+\chapter{Task 4: SQL Statements and Screenshot Evidence}
+\label{ch:task4}
+
+This chapter includes the SQL DDL script for Task 4, split into logical sections for clarity. Each section contains the relevant code excerpts. Screenshots of the code execution and results are provided in the figures below. The full DDL script is available in the submission root: \verb|Roberts_Slade_IP_Task4.sql|.
+
+\section{Dropping Existing Tables}
+
+The script starts by dropping tables in reverse dependency order to avoid foreign key conflicts.
+
+\begin{lstlisting}
+-- Drop tables in reverse dependency order to avoid FK conflicts
+DROP TABLE IF EXISTS Report;
+DROP TABLE IF EXISTS CreditCardPayment;
+DROP TABLE IF EXISTS CheckPayment;
+DROP TABLE IF EXISTS Donation;
+DROP TABLE IF EXISTS Donor;
+DROP TABLE IF EXISTS Project;
+DROP TABLE IF EXISTS Enrollment;
+DROP TABLE IF EXISTS Program;
+DROP TABLE IF EXISTS NationalPark;
+DROP TABLE IF EXISTS RangerTeamOverseen;
+DROP TABLE IF EXISTS Researcher;
+DROP TABLE IF EXISTS Mentorship;
+DROP INDEX IF EXISTS UX_RTA_Ranger ON RangerTeamAssignment;
+DROP TABLE IF EXISTS RangerTeamAssignment;
+DROP TABLE IF EXISTS RangerTeam;
+DROP TABLE IF EXISTS RangerCertification;
+DROP TABLE IF EXISTS Ranger;
+DROP TABLE IF EXISTS Visitor;
+DROP TABLE IF EXISTS ParkPass;
+DROP TABLE IF EXISTS EmergencyContact;
+DROP TABLE IF EXISTS PersonEmail;
+DROP TABLE IF EXISTS PersonPhone;
+DROP TABLE IF EXISTS Person;
+\end{lstlisting}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{screenshots/01_dropping_tables.png}
+  \caption{Screenshot of dropping existing tables section}
+\end{figure}
+
+\section{Person and Contact Tables}
+
+Creation of the Person table and related contact information tables.
+
+\begin{lstlisting}
+-- Person table stores individuals
+-- Uses NVARCHAR for PersonID as username or external ID
+-- Names use NVARCHAR for international support
+-- DOB is DATE for easy age calculation
+-- NewsletterSubscribed defaults to 0
+CREATE TABLE Person (
+	PersonID NVARCHAR(50) PRIMARY KEY,
+	FirstName NVARCHAR(100) NOT NULL,
+	MiddleInitial NCHAR(1) NULL,
+	LastName NVARCHAR(100) NOT NULL,
+	DOB DATE NOT NULL,
+	Gender NVARCHAR(20) NULL,
+	Street NVARCHAR(200) NULL,
+	City NVARCHAR(100) NULL,
+	State NVARCHAR(50) NULL,
+	PostalCode NVARCHAR(20) NULL,
+	NewsletterSubscribed BIT NOT NULL DEFAULT(0)
+);
+
+-- PersonPhone stores phone numbers, composite PK
+-- NVARCHAR keeps formatting, prevents duplicate numbers per person
+CREATE TABLE PersonPhone (
+	PersonID NVARCHAR(50) NOT NULL,
+	PhoneNumber NVARCHAR(50) NOT NULL,
+	PRIMARY KEY (PersonID, PhoneNumber),
+	CONSTRAINT FK_PersonPhone_Person FOREIGN KEY (PersonID) REFERENCES Person(PersonID)
+);
+
+-- PersonEmail stores emails, composite PK
+CREATE TABLE PersonEmail (
+	PersonID NVARCHAR(50) NOT NULL,
+	Email NVARCHAR(255) NOT NULL,
+	PRIMARY KEY (PersonID, Email),
+	CONSTRAINT FK_PersonEmail_Person FOREIGN KEY (PersonID) REFERENCES Person(PersonID)
+);
+
+-- EmergencyContact stores emergency contacts
+-- Uses identity key for unique updates/deletes
+CREATE TABLE EmergencyContact (
+	EmergencyContactID INT IDENTITY(1,1) PRIMARY KEY,
+	PersonID NVARCHAR(50) NOT NULL,
+	ContactName NVARCHAR(200) NOT NULL,
+	Relationship NVARCHAR(100) NULL,
+	PhoneNumber NVARCHAR(50) NOT NULL,
+	CONSTRAINT FK_EmergencyContact_Person FOREIGN KEY (PersonID) REFERENCES Person(PersonID)
+);
+\end{lstlisting}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{screenshots/02_person_contact_tables.png}
+  \caption{Screenshot of Person and Contact tables section}
+\end{figure}
+
+\section{Park Pass and Visitor Tables}
+
+Tables for park passes and visitor roles.
+
+\begin{lstlisting}
+-- ParkPass stores pass types, identity for joins
+CREATE TABLE ParkPass (
+	PassID INT IDENTITY(1,1) PRIMARY KEY,
+	PassType NVARCHAR(50) NOT NULL,
+	ExpirationDate DATE NULL
+);
+
+-- Visitor is a role table, reuses PersonID as PK
+-- Models is-a relationship with Person
+CREATE TABLE Visitor (
+	VisitorID NVARCHAR(50) PRIMARY KEY,
+	PassID INT NULL,
+	CONSTRAINT FK_Visitor_Person FOREIGN KEY (VisitorID) REFERENCES Person(PersonID),
+	CONSTRAINT FK_Visitor_Pass FOREIGN KEY (PassID) REFERENCES ParkPass(PassID)
+);
+\end{lstlisting}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{screenshots/03_park_pass_visitor.png}
+  \caption{Screenshot of Park Pass and Visitor tables section}
+\end{figure}
+
+\section{Ranger and Team Tables}
+
+Tables for rangers, certifications, teams, assignments, and mentorship.
+
+\begin{lstlisting}
+CREATE TABLE Ranger (
+	RangerID NVARCHAR(50) PRIMARY KEY,
+	StartDate DATE NOT NULL,
+	Status NVARCHAR(20) NOT NULL,
+	CONSTRAINT FK_Ranger_Person FOREIGN KEY (RangerID) REFERENCES Person(PersonID)
+);
+
+CREATE TABLE RangerCertification (
+	RangerID NVARCHAR(50) NOT NULL,
+	Certification NVARCHAR(200) NOT NULL,
+	PRIMARY KEY (RangerID, Certification),
+	CONSTRAINT FK_RangerCertification_Ranger FOREIGN KEY (RangerID) REFERENCES Ranger(RangerID)
+);
+
+CREATE TABLE RangerTeam (
+	TeamID INT IDENTITY(1,1) PRIMARY KEY,
+	FocusArea NVARCHAR(200) NULL,
+	FormationDate DATE NULL
+);
+
+-- RangerTeamAssignment assigns rangers to teams
+-- Unique index ensures ranger on at most one team
+CREATE TABLE RangerTeamAssignment (
+	TeamID INT NOT NULL,
+	RangerID NVARCHAR(50) NOT NULL,
+	AssignmentStartDate DATE NULL,
+	Status NVARCHAR(20) NULL,
+	IsLeader BIT NOT NULL DEFAULT(0),
+	PRIMARY KEY (TeamID, RangerID),
+	CONSTRAINT FK_RTA_Team FOREIGN KEY (TeamID) REFERENCES RangerTeam(TeamID),
+	CONSTRAINT FK_RTA_Ranger FOREIGN KEY (RangerID) REFERENCES Ranger(RangerID)
+);
+
+CREATE UNIQUE INDEX UX_RTA_Ranger ON RangerTeamAssignment(RangerID);
+
+CREATE TABLE Mentorship (
+	MentorRangerID NVARCHAR(50) NOT NULL,
+	MenteeRangerID NVARCHAR(50) NOT NULL,
+	MentorshipStartDate DATE NULL,
+	PRIMARY KEY (MentorRangerID, MenteeRangerID),
+	CONSTRAINT FK_Mentorship_Mentor FOREIGN KEY (MentorRangerID) REFERENCES Ranger(RangerID),
+	CONSTRAINT FK_Mentorship_Mentee FOREIGN KEY (MenteeRangerID) REFERENCES Ranger(RangerID),
+	CONSTRAINT UQ_Mentorship_Mentee UNIQUE (MenteeRangerID)
+);
+\end{lstlisting}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{screenshots/04_ranger_team.png}
+  \caption{Screenshot of Ranger and Team tables section}
+\end{figure}
+
+\section{Researcher and Oversight Tables}
+
+Tables for researchers and team oversight.
+
+\begin{lstlisting}
+CREATE TABLE Researcher (
+	ResearcherID NVARCHAR(50) PRIMARY KEY,
+	Field NVARCHAR(200) NULL,
+	HireDate DATE NULL,
+	Salary DECIMAL(12,2) NULL,
+	CONSTRAINT FK_Researcher_Person FOREIGN KEY (ResearcherID) REFERENCES Person(PersonID)
+);
+
+CREATE TABLE RangerTeamOverseen (
+	TeamID INT PRIMARY KEY,
+	ResearcherID NVARCHAR(50) NOT NULL,
+	CONSTRAINT FK_RTO_Team FOREIGN KEY (TeamID) REFERENCES RangerTeam(TeamID),
+	CONSTRAINT FK_RTO_Researcher FOREIGN KEY (ResearcherID) REFERENCES Researcher(ResearcherID)
+);
+\end{lstlisting}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{screenshots/05_researcher_oversight.png}
+  \caption{Screenshot of Researcher and Oversight tables section}
+\end{figure}
+
+\section{Park and Program Tables}
+
+Tables for national parks, programs, and enrollments.
+
+\begin{lstlisting}
+CREATE TABLE NationalPark (
+	ParkName NVARCHAR(200) PRIMARY KEY,
+	Street NVARCHAR(200) NULL,
+	City NVARCHAR(100) NULL,
+	State NVARCHAR(50) NULL,
+	PostalCode NVARCHAR(20) NULL,
+	EstablishmentDate DATE NULL,
+	Capacity INT NULL
+);
+
+CREATE TABLE Program (
+	ProgramID INT IDENTITY(1,1) PRIMARY KEY,
+	ParkName NVARCHAR(200) NOT NULL,
+	ProgramName NVARCHAR(200) NOT NULL,
+	Type NVARCHAR(100) NULL,
+	StartDate DATE NULL,
+	DurationHours INT NULL,
+	CONSTRAINT FK_Program_Park FOREIGN KEY (ParkName) REFERENCES NationalPark(ParkName)
+);
+
+-- Enrollment associates Visitor with Program on VisitDate
+-- VisitDate in PK allows multiple visits to same program
+CREATE TABLE Enrollment (
+	VisitorID NVARCHAR(50) NOT NULL,
+	ProgramID INT NOT NULL,
+	VisitDate DATE NOT NULL,
+	AccessibilityNeeds NVARCHAR(500) NULL,
+	PRIMARY KEY (VisitorID, ProgramID, VisitDate),
+	CONSTRAINT FK_Enrollment_Visitor FOREIGN KEY (VisitorID) REFERENCES Visitor(VisitorID),
+	CONSTRAINT FK_Enrollment_Program FOREIGN KEY (ProgramID) REFERENCES Program(ProgramID)
+);
+\end{lstlisting}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{screenshots/06_park_program.png}
+  \caption{Screenshot of Park and Program tables section}
+\end{figure}
+
+\section{Project Table}
+
+Table for projects.
+
+\begin{lstlisting}
+CREATE TABLE Project (
+	ProjectID INT IDENTITY(1,1) PRIMARY KEY,
+	ParkName NVARCHAR(200) NOT NULL,
+	ProjectName NVARCHAR(200) NOT NULL,
+	StartDate DATE NULL,
+	Budget DECIMAL(15,2) NULL,
+	CONSTRAINT FK_Project_Park FOREIGN KEY (ParkName) REFERENCES NationalPark(ParkName)
+);
+\end{lstlisting}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{screenshots/07_project.png}
+  \caption{Screenshot of Project table section}
+\end{figure}
+
+\section{Donation Tables}
+
+Tables for donors and donations, including payment details.
+
+\begin{lstlisting}
+CREATE TABLE Donor (
+	DonorID NVARCHAR(50) PRIMARY KEY,
+	IsAnonymous BIT NOT NULL DEFAULT(0),
+	CONSTRAINT FK_Donor_Person FOREIGN KEY (DonorID) REFERENCES Person(PersonID)
+);
+
+-- Donation stores transactions, CHECK limits PaymentType
+CREATE TABLE Donation (
+	DonationID INT IDENTITY(1,1) PRIMARY KEY,
+	DonorID NVARCHAR(50) NOT NULL,
+	DonationDate DATE NOT NULL,
+	Amount DECIMAL(14,2) NOT NULL,
+	CampaignName NVARCHAR(200) NULL,
+	PaymentType NVARCHAR(20) NOT NULL CHECK (PaymentType IN ('CHECK','CARD')),
+	CONSTRAINT FK_Donation_Donor FOREIGN KEY (DonorID) REFERENCES Donor(DonorID)
+);
+
+CREATE TABLE CheckPayment (
+	DonationID INT PRIMARY KEY,
+	CheckNumber NVARCHAR(100) NULL,
+	CONSTRAINT FK_CheckPayment_Donation FOREIGN KEY (DonationID) REFERENCES Donation(DonationID)
+);
+
+CREATE TABLE CreditCardPayment (
+	DonationID INT PRIMARY KEY,
+	CardType NVARCHAR(50) NULL,
+	LastFourDigits NCHAR(4) NULL,
+	ExpirationDate DATE NULL,
+	CONSTRAINT FK_CCP_Donation FOREIGN KEY (DonationID) REFERENCES Donation(DonationID)
+);
+\end{lstlisting}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{screenshots/08_donation.png}
+  \caption{Screenshot of Donation tables section}
+\end{figure}
+
+\section{Report Table}
+
+Table for reports.
+
+\begin{lstlisting}
+CREATE TABLE Report (
+	ReportID INT IDENTITY(1,1) PRIMARY KEY,
+	TeamID INT NOT NULL,
+	ResearcherID NVARCHAR(50) NOT NULL,
+	ReportDate DATE NOT NULL,
+	Summary NVARCHAR(MAX) NULL,
+	CONSTRAINT FK_Report_Team FOREIGN KEY (TeamID) REFERENCES RangerTeam(TeamID),
+	CONSTRAINT FK_Report_Researcher FOREIGN KEY (ResearcherID) REFERENCES Researcher(ResearcherID)
+);
+\end{lstlisting}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{screenshots/09_report.png}
+  \caption{Screenshot of Report table section}
+\end{figure}
+
+\section{Indexes}
+
+Creation of useful indexes to support common queries.
+
+\begin{lstlisting}
+-- Indexes for common lookups: last names, programs, donations
+-- Avoid too many to prevent slow writes
+DROP INDEX IF EXISTS IX_Person_LastName ON Person;
+DROP INDEX IF EXISTS IX_Person_Newsletter ON Person;
+DROP INDEX IF EXISTS IX_Program_Park_StartDate ON Program;
+DROP INDEX IF EXISTS IX_RTA_TeamID ON RangerTeamAssignment;
+DROP INDEX IF EXISTS IX_Donation_Date ON Donation;
+DROP INDEX IF EXISTS IX_Donation_DonorID ON Donation;
+DROP INDEX IF EXISTS IX_Donor_IsAnonymous ON Donor;
+CREATE INDEX IX_Person_LastName ON Person(LastName);
+CREATE INDEX IX_Person_Newsletter ON Person(NewsletterSubscribed);
+CREATE INDEX IX_Program_Park_StartDate ON Program(ParkName, StartDate);
+CREATE INDEX IX_RTA_TeamID ON RangerTeamAssignment(TeamID);
+CREATE INDEX IX_Donation_Date ON Donation(DonationDate);
+CREATE INDEX IX_Donation_DonorID ON Donation(DonorID);
+CREATE INDEX IX_Donor_IsAnonymous ON Donor(IsAnonymous);
+\end{lstlisting}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{screenshots/10_indexes.png}
+  \caption{Screenshot of Indexes section}
+\end{figure}
+
+\section{Sample Data}
+
+Insertion of sample data for NationalPark.
+
+\begin{lstlisting}
+-- Insert sample data for NationalPark
+INSERT INTO NationalPark (ParkName, State, EstablishmentDate) VALUES
+('Yellowstone', 'Wyoming', '1872-03-01'),
+('Yosemite', 'California', '1890-10-01'),
+('Grand Canyon', 'Arizona', '1919-02-26'),
+('Zion', 'Utah', '1919-11-19');
+\end{lstlisting}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{screenshots/11_sample_data.png}
+  \caption{Screenshot of Sample Data section}
+\end{figure}
+
+\section{Conclusion}
+
+The SQL DDL script successfully creates all necessary tables for the NPSS database with appropriate constraints, foreign keys, and indexes. The structure follows database normalization principles and includes:
+
+\begin{itemize}
+    \item Proper primary and foreign key relationships
+    \item Check constraints for data validation
+    \item Indexes optimized for common query patterns
+    \item Support for multi-valued attributes through junction tables
+    \item Identity columns for auto-generated keys
+    \item Sample data to facilitate testing
+\end{itemize}
+
+All tables were created successfully in Azure SQL Database as evidenced by the execution screenshots provided in this chapter.

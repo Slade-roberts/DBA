@@ -1,0 +1,211 @@
+\chapter{Task 2: Relational Database Schemas}
+
+This section lists the tables created from the ER diagram.  
+Each table shows its main attributes. (PK) means primary key and (FK) means foreign key.
+
+\section*{Person and Contact Tables}
+
+\textbf{Person}
+\begin{itemize}
+  \item PersonID (PK)
+  \item FirstName
+  \item MiddleInitial
+  \item LastName
+  \item DOB
+  \item Gender
+  \item Street
+  \item City
+  \item State
+  \item PostalCode
+  \item NewsletterSubscribed
+\end{itemize}
+
+\textbf{PersonPhone}
+\begin{itemize}
+  \item PersonID (FK)
+  \item PhoneNumber
+  \item (PK) PersonID, PhoneNumber
+\end{itemize}
+
+\textbf{PersonEmail}
+\begin{itemize}
+  \item PersonID (FK)
+  \item Email
+  \item (PK) PersonID, Email
+\end{itemize}
+
+\textbf{EmergencyContact}
+\begin{itemize}
+  \item EmergencyContactID (PK)
+  \item PersonID (FK)
+  \item ContactName
+  \item Relationship
+  \item PhoneNumber
+\end{itemize}
+
+\section*{Visitor and Park Pass}
+
+\textbf{Visitor}
+\begin{itemize}
+  \item VisitorID (PK, FK)
+  \item PassID (FK)
+\end{itemize}
+
+\textbf{ParkPass}
+\begin{itemize}
+  \item PassID (PK)
+  \item PassType
+  \item ExpirationDate
+\end{itemize}
+
+\section*{Rangers and Teams}
+
+\textbf{Ranger}
+\begin{itemize}
+  \item RangerID (PK, FK)
+  \item StartDate
+  \item Status
+\end{itemize}
+
+\textbf{RangerCertification}
+\begin{itemize}
+  \item RangerID (FK)
+  \item CertificationName
+  \item IssueDate
+  \item ExpirationDate
+  \item (PK) RangerID, CertificationName
+\end{itemize}
+
+\textbf{RangerTeam}
+\begin{itemize}
+  \item TeamID (PK)
+  \item FocusArea
+  \item FormationDate
+\end{itemize}
+
+\textbf{RangerTeamAssignment}
+\begin{itemize}
+  \item TeamID (FK)
+  \item RangerID (FK)
+  \item AssignmentDate
+  \item Role
+  \item (PK) TeamID, RangerID
+\end{itemize}
+
+\textbf{Mentorship}
+\begin{itemize}
+  \item MentorRangerID (FK)
+  \item MenteeRangerID (FK)
+  \item MentorshipStartDate
+  \item (PK) MentorRangerID, MenteeRangerID
+\end{itemize}
+
+\section*{Researchers and Oversight}
+
+\textbf{Researcher}
+\begin{itemize}
+  \item ResearcherID (PK, FK)
+  \item Field
+  \item HireDate
+  \item Salary
+\end{itemize}
+
+\textbf{RangerTeamOverseen}
+\begin{itemize}
+  \item TeamID (FK)
+  \item LeaderRangerID (FK)
+  \item ResearcherID (FK)
+  \item OverSightStartDate
+  \item (PK) TeamID
+\end{itemize}
+
+\section*{Parks and Programs}
+
+\textbf{NationalPark}
+\begin{itemize}
+  \item ParkName (PK)
+  \item Street
+  \item City
+  \item State
+  \item PostalCode
+  \item EstablishmentDate
+  \item Capacity
+\end{itemize}
+
+\textbf{Program}
+\begin{itemize}
+  \item ProgramID (PK)
+  \item ParkName (FK)
+  \item ProgramName
+  \item Type
+  \item StartDate
+  \item DurationHours
+\end{itemize}
+
+\textbf{Enrollment}
+\begin{itemize}
+  \item VisitorID (FK)
+  \item ProgramID (FK)
+  \item VisitDate
+  \item AccessibilityNeeds
+  \item (PK) VisitorID, ProgramID, VisitDate
+\end{itemize}
+
+\section*{Projects and Reports}
+
+\textbf{Project}
+\begin{itemize}
+  \item ProjectID (PK)
+  \item ParkName (FK)
+  \item ProjectName
+  \item StartDate
+  \item Budget
+\end{itemize}
+
+\textbf{Report}
+\begin{itemize}
+  \item ReportID (PK)
+  \item TeamID (FK)
+  \item ResearcherID (FK)
+  \item ReportDate
+  \item Summary
+\end{itemize}
+
+\section*{Donations and Payments}
+
+\textbf{Donor}
+\begin{itemize}
+  \item DonorID (PK, FK)
+  \item IsAnonymous
+\end{itemize}
+
+\textbf{Donation}
+\begin{itemize}
+  \item DonationID (PK)
+  \item DonorID (FK)
+  \item DonationDate
+  \item Amount
+  \item CampaignName
+  \item PaymentType
+\end{itemize}
+
+\textbf{CheckPayment}
+\begin{itemize}
+  \item DonationID (PK, FK)
+  \item CheckNumber
+\end{itemize}
+
+\textbf{CreditCardPayment}
+\begin{itemize}
+  \item DonationID (PK, FK)
+  \item CardType
+  \item LastFourDigits
+  \item ExpirationDate
+\end{itemize}
+
+\section*{Notes}
+\begin{itemize}
+  \item All foreign keys connect related tables and keep the data consistent.
+  \item Many-to-many relationships like Enrollment and Mentorship use link tables.
+  \item Derived attributes such as Age and YearsOfService are not stored directly.
+\end{itemize}

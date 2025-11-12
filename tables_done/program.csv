@@ -1,0 +1,6 @@
+ProgramID,ParkName,ProgramName,Type,StartDate,DurationHours
+42,Yellowstone,Hiking Program 1,Outdoor,2025-01-01,5
+43,Grand Canyon,Rafting Program 2,Adventure,2025-01-01,8
+44,Yosemite,Climbing Program 3,Sports,2025-01-01,6
+45,Zion,Hiking Program 4,Outdoor,2025-01-01,4
+46,Rocky Mountain,Skiing Program 5,Winter,2025-01-01,7

@@ -1,0 +1,10 @@
+DonationID,DonorID,DonationDate,Amount,CampaignName,PaymentType
+58,donor6,2025-01-01,100.00,Park Maintenance,CHECK
+59,donor7,2025-01-02,200.00,Education,CARD
+60,donor8,2025-01-03,150.00,Wildlife,CHECK
+61,donor9,2025-01-04,250.00,Trails,CARD
+62,donor10,2025-01-05,300.00,Visitor Center,CHECK
+63,donor2,2025-11-11,200.00,,CHECK
+64,donor3,2025-11-11,150.00,,CARD
+65,donor4,2025-11-11,250.00,,CHECK
+66,donor5,2025-11-11,300.00,,CARD

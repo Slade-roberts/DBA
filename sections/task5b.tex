@@ -1,0 +1,970 @@
+\chapter{Task 5b: Java Application}
+
+This chapter includes the Java application code developed for Task 5b. The application provides a menu-driven interface for interacting with all stored procedures created in Task 5a, plus import/export functionality.
+
+\section{Application Overview}
+
+The Java application \texttt{Roberts\_Slade\_IP\_Task5b.java} is a single-file console application that:
+\begin{itemize}
+    \item Connects to Azure SQL Database using JDBC
+    \item Provides an interactive menu with 18 options
+    \item Calls all 15 stored procedures from Task 5a
+    \item Supports importing team data from CSV files
+    \item Exports mailing list and all table data to CSV files
+    \item Includes comprehensive error handling
+    \item Automatically exports all tables after modifying operations
+\end{itemize}
+
+\section{Imports and Class Declaration}
+
+\begin{lstlisting}[label={lst5b:imports}]
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.Date;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Types;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
+import java.util.Scanner;
+
+/**
+ * Roberts_Slade_IP_Task5b
+ * Single-file Java menu client for Task 5 stored procedures.
+ * Author: Slade Roberts
+ * Date: 2025-11-09
+ */
+public class Roberts_Slade_IP_Task5b {
+	private static Connection conn;
+	private static final Scanner sc = new Scanner(System.in);
+
+	private static final List<String> TABLES = Arrays.asList(
+		"Person", "PersonPhone", "PersonEmail", "EmergencyContact",
+		"ParkPass", "Visitor", "Ranger", "RangerCertification",
+		"RangerTeam", "RangerTeamAssignment", "Mentorship",
+		"Researcher", "RangerTeamOverseen", "NationalPark",
+		"Program", "Enrollment", "Project", "Donor",
+		"Donation", "CheckPayment", "CreditCardPayment", "Report"
+	);
+
+	private static final Path EXPORT_DIR = Paths.get("../table_results");
+	private static final SimpleDateFormat TIMESTAMP_FORMAT = 
+	    new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_imports.png}
+\caption{Screenshot of imports and class declaration}
+\end{figure}
+
+\section{Main Method}
+
+The main method establishes database connection and runs the main menu loop.
+
+\begin{lstlisting}[label={lst5b:main}]
+public static void main(String[] args) throws Exception {
+	Properties props = new Properties();
+	try (FileInputStream fis = new FileInputStream("db.properties")) {
+		props.load(fis);
+	} catch (Exception e) {
+		System.out.println("Please create db.properties in project root.");
+		System.out.println(e.getMessage());
+		return;
+	}
+
+	String url = props.getProperty("jdbc.url");
+	String user = props.getProperty("jdbc.user");
+	String pass = props.getProperty("jdbc.password");
+	conn = DriverManager.getConnection(url, user, pass);
+	System.out.println("Connected to database.");
+
+	while (true) {
+		printMenu();
+		String choice = sc.nextLine().trim();
+		try {
+			int opt = Integer.parseInt(choice);
+			if (opt == 18) break;
+			handleOption(opt);
+		} catch (NumberFormatException ex) {
+			System.out.println("Invalid option. Enter a number.");
+		}
+	}
+
+	conn.close();
+	System.out.println("Goodbye.");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_main.png}
+\caption{Screenshot of main method}
+\end{figure}
+
+\section{Print Menu Method}
+
+Displays the interactive menu with all 18 options.
+
+\begin{lstlisting}[label={lst5b:printmenu}]
+private static void printMenu() {
+	System.out.println("\nWELCOME TO THE NATIONAL PARK SERVICE SYSTEM DATABASE");
+	System.out.println("1) Insert a new visitor and enroll in programs");
+	System.out.println("2) Insert a new ranger");
+	System.out.println("3) Insert a new ranger team and set its leader");
+	System.out.println("4) Insert a new donation");
+	System.out.println("5) Insert a new researcher");
+	System.out.println("6) Insert a report by a ranger team to a researcher");
+	System.out.println("7) Insert a new park program");
+	System.out.println("8) Retrieve emergency contacts for a person");
+	System.out.println("9) Retrieve visitors enrolled in a program");
+	System.out.println("10) Retrieve park programs after a date");
+	System.out.println("11) Anonymous donation stats for a month");
+	System.out.println("12) List rangers in a team");
+	System.out.println("13) List all individuals");
+	System.out.println("14) Increase salary for multi-team researchers");
+	System.out.println("15) Delete inactive visitors");
+	System.out.println("16) Import teams from file (CSV)");
+	System.out.println("17) Export mailing list to file (CSV)");
+	System.out.println("18) Quit");
+	System.out.print("Choose option: ");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_printmenu.png}
+\caption{Screenshot of printMenu method}
+\end{figure}
+
+\section{Handle Option Method}
+
+Routes menu selections to appropriate handler methods.
+
+\begin{lstlisting}[label={lst5b:handleoption}]
+private static void handleOption(int opt) throws SQLException {
+	switch (opt) {
+		case 1: doInsertVisitor(); exportAllTables(); break;
+		case 2: doInsertRanger(); exportAllTables(); break;
+		case 3: doInsertTeam(); exportAllTables(); break;
+		case 4: doInsertDonation(); exportAllTables(); break;
+		case 5: doInsertResearcher(); exportAllTables(); break;
+		case 6: doInsertReport(); exportAllTables(); break;
+		case 7: doInsertProgram(); exportAllTables(); break;
+		case 8: doGetEmergencyContacts(); break;
+		case 9: doGetVisitorsByProgram(); break;
+		case 10: doGetProgramsAfterDate(); break;
+		case 11: doAnonymousDonationStats(); break;
+		case 12: doGetRangersInTeam(); break;
+		case 13: doGetAllIndividuals(); break;
+		case 14: doIncreaseSalary(); exportAllTables(); break;
+		case 15: doDeleteInactiveVisitors(); exportAllTables(); break;
+		case 16: doImportTeams(); exportAllTables(); break;
+		case 17: doExportMailingList(); break;
+		default: System.out.println("Option not implemented.");
+	}
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_handleoption.png}
+\caption{Screenshot of handleOption method}
+\end{figure}
+
+\section{Insert Methods}
+
+\subsection{doInsertVisitor Method}
+
+Prompts for visitor information and calls \texttt{sp\_InsertVisitorWithEnrollments}.
+
+\begin{lstlisting}[label={lst5b:doinsertvisitor}]
+private static void doInsertVisitor() throws SQLException {
+	System.out.print("Enter data manually (M) or from file (F): ");
+	String choice = sc.nextLine().toUpperCase();
+	String id, fn, ln, dob, nl, pass, enroll;
+	
+	if (choice.equals("F")) {
+		System.out.print("Enter file path: ");
+		String filePath = sc.nextLine();
+		try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+			id = br.readLine();
+			fn = br.readLine();
+			ln = br.readLine();
+			dob = br.readLine();
+			nl = br.readLine();
+			pass = br.readLine();
+			enroll = br.readLine();
+		} catch (IOException e) {
+			System.out.println("Error reading file: " + e.getMessage());
+			return;
+		}
+	} else {
+		System.out.print("PersonID: "); id = sc.nextLine();
+		System.out.print("FirstName: "); fn = sc.nextLine();
+		System.out.print("LastName: "); ln = sc.nextLine();
+		System.out.print("DOB (YYYY-MM-DD): "); dob = sc.nextLine();
+		System.out.print("Newsletter? (0/1): "); nl = sc.nextLine();
+		System.out.print("PassID (or blank): "); pass = sc.nextLine();
+		System.out.print("Enrollments (ProgramID:YYYY-MM-DD, comma separated) or blank: ");
+		enroll = sc.nextLine();
+	}
+
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_InsertVisitorWithEnrollments(?,?,?,?,?,?,?,?,?,?,?,?,?)}")) {
+		cstmt.setString(1, id);
+		cstmt.setString(2, fn);
+		cstmt.setString(3, null);
+		cstmt.setString(4, ln);
+		cstmt.setDate(5, Date.valueOf(dob));
+		cstmt.setString(6, null);
+		cstmt.setString(7, null);
+		cstmt.setString(8, null);
+		cstmt.setString(9, null);
+		cstmt.setString(10, null);
+		cstmt.setBoolean(11, "1".equals(nl));
+		if (pass.isBlank()) 
+		    cstmt.setNull(12, Types.INTEGER); 
+		else 
+		    cstmt.setInt(12, Integer.parseInt(pass));
+		cstmt.setString(13, enroll);
+		cstmt.execute();
+	}
+	System.out.println("Inserted visitor and enrollments (if provided).");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_doinsertvisitor.png}
+\caption{Screenshot of doInsertVisitor method}
+\end{figure}
+
+\subsection{doInsertRanger Method}
+
+\begin{lstlisting}[label={lst5b:doinsertranger}]
+private static void doInsertRanger() throws SQLException {
+	System.out.print("Enter data manually (M) or from file (F): ");
+	String choice = sc.nextLine().toUpperCase();
+	String rid, sd, st;
+	
+	if (choice.equals("F")) {
+		System.out.print("Enter file path: ");
+		String filePath = sc.nextLine();
+		try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+			rid = br.readLine();
+			sd = br.readLine();
+			st = br.readLine();
+		} catch (IOException e) {
+			System.out.println("Error reading file: " + e.getMessage());
+			return;
+		}
+	} else {
+		System.out.print("RangerID (PersonID): "); rid = sc.nextLine();
+		System.out.print("StartDate (YYYY-MM-DD): "); sd = sc.nextLine();
+		System.out.print("Status: "); st = sc.nextLine();
+	}
+	
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_InsertRanger(?,?,?)}")) {
+		cstmt.setString(1, rid);
+		cstmt.setDate(2, Date.valueOf(sd));
+		cstmt.setString(3, st);
+		cstmt.execute();
+	}
+	System.out.println("Inserted ranger.");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_doinsertranger.png}
+\caption{Screenshot of doInsertRanger method}
+\end{figure}
+
+\subsection{doInsertTeam Method}
+
+\begin{lstlisting}[label={lst5b:doinsertteam}]
+private static void doInsertTeam() throws SQLException {
+	System.out.print("Enter data manually (M) or from file (F): ");
+	String choice = sc.nextLine().toUpperCase();
+	String fa, leader;
+	
+	if (choice.equals("F")) {
+		System.out.print("Enter file path: ");
+		String filePath = sc.nextLine();
+		try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+			fa = br.readLine();
+			leader = br.readLine();
+		} catch (IOException e) {
+			System.out.println("Error reading file: " + e.getMessage());
+			return;
+		}
+	} else {
+		System.out.print("FocusArea: "); fa = sc.nextLine();
+		System.out.print("Leader RangerID: "); leader = sc.nextLine();
+	}
+	
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_InsertRangerTeamWithLeader(?,?,?)}")) {
+		cstmt.setString(1, fa);
+		cstmt.setNull(2, Types.DATE);
+		cstmt.setString(3, leader);
+		cstmt.execute();
+	}
+	System.out.println("Inserted team and leader assignment.");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_doinsertteam.png}
+\caption{Screenshot of doInsertTeam method}
+\end{figure}
+
+\subsection{doInsertDonation Method}
+
+\begin{lstlisting}[label={lst5b:doinsertdonation}]
+private static void doInsertDonation() throws SQLException {
+	System.out.print("Enter data manually (M) or from file (F): ");
+	String choice = sc.nextLine().toUpperCase();
+	String did, amt, pt, cn = null, ct = null, lf = null;
+	
+	if (choice.equals("F")) {
+		System.out.print("Enter file path: ");
+		String filePath = sc.nextLine();
+		try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+			did = br.readLine();
+			amt = br.readLine();
+			pt = br.readLine();
+			if (pt.equalsIgnoreCase("CHECK")) {
+				cn = br.readLine();
+			} else {
+				ct = br.readLine();
+				lf = br.readLine();
+			}
+		} catch (IOException e) {
+			System.out.println("Error reading file: " + e.getMessage());
+			return;
+		}
+	} else {
+		System.out.print("DonorID: "); did = sc.nextLine();
+		System.out.print("Amount: "); amt = sc.nextLine();
+		System.out.print("PaymentType (CHECK/CARD): "); pt = sc.nextLine();
+		if (pt.equalsIgnoreCase("CHECK")) {
+			System.out.print("CheckNumber: "); cn = sc.nextLine();
+		} else {
+			System.out.print("CardType: "); ct = sc.nextLine();
+			System.out.print("LastFour: "); lf = sc.nextLine();
+		}
+	}
+	
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_InsertDonation(?,?,?,?,?,?,?,?)}")) {
+		cstmt.setString(1, did);
+		cstmt.setDate(2, new Date(System.currentTimeMillis()));
+		cstmt.setBigDecimal(3, new java.math.BigDecimal(amt));
+		cstmt.setString(4, null);
+		cstmt.setString(5, pt);
+		if (pt.equalsIgnoreCase("CHECK")) {
+			cstmt.setString(6, cn);
+			cstmt.setNull(7, Types.VARCHAR); 
+			cstmt.setNull(8, Types.DATE);
+		} else {
+			cstmt.setNull(6, Types.VARCHAR);
+			cstmt.setString(7, ct);
+			cstmt.setString(8, lf);
+		}
+		cstmt.execute();
+	}
+	System.out.println("Donation inserted.");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_doinsertdonation.png}
+\caption{Screenshot of doInsertDonation method}
+\end{figure}
+
+\subsection{doInsertResearcher Method}
+
+\begin{lstlisting}[label={lst5b:doinsertresearcher}]
+private static void doInsertResearcher() throws SQLException {
+	System.out.print("Enter data manually (M) or from file (F): ");
+	String choice = sc.nextLine().toUpperCase();
+	String rid, field, hd, sal;
+	
+	if (choice.equals("F")) {
+		System.out.print("Enter file path: ");
+		String filePath = sc.nextLine();
+		try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+			rid = br.readLine();
+			field = br.readLine();
+			hd = br.readLine();
+			sal = br.readLine();
+		} catch (IOException e) {
+			System.out.println("Error reading file: " + e.getMessage());
+			return;
+		}
+	} else {
+		System.out.print("ResearcherID: "); rid = sc.nextLine();
+		System.out.print("Field: "); field = sc.nextLine();
+		System.out.print("HireDate (YYYY-MM-DD): "); hd = sc.nextLine();
+		System.out.print("Salary: "); sal = sc.nextLine();
+	}
+	
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_InsertResearcher(?,?,?,?)}")) {
+		cstmt.setString(1, rid);
+		cstmt.setString(2, field);
+		cstmt.setDate(3, Date.valueOf(hd));
+		cstmt.setBigDecimal(4, new java.math.BigDecimal(sal));
+		cstmt.execute();
+	}
+	System.out.println("Researcher inserted.");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_doinsertresearcher.png}
+\caption{Screenshot of doInsertResearcher method}
+\end{figure}
+
+\subsection{doInsertReport Method}
+
+\begin{lstlisting}[label={lst5b:doinsertreport}]
+private static void doInsertReport() throws SQLException {
+	System.out.print("Enter data manually (M) or from file (F): ");
+	String choice = sc.nextLine().toUpperCase();
+	String tidStr, rid, sum;
+	
+	if (choice.equals("F")) {
+		System.out.print("Enter file path: ");
+		String filePath = sc.nextLine();
+		try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+			tidStr = br.readLine();
+			rid = br.readLine();
+			sum = br.readLine();
+		} catch (IOException e) {
+			System.out.println("Error reading file: " + e.getMessage());
+			return;
+		}
+	} else {
+		System.out.print("TeamID: "); tidStr = sc.nextLine();
+		System.out.print("ResearcherID: "); rid = sc.nextLine();
+		System.out.print("Summary: "); sum = sc.nextLine();
+	}
+	
+	int tid = Integer.parseInt(tidStr);
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_InsertReport(?,?,?,?)}")) {
+		cstmt.setInt(1, tid); 
+		cstmt.setString(2, rid); 
+		cstmt.setDate(3, new Date(System.currentTimeMillis())); 
+		cstmt.setString(4, sum);
+		cstmt.execute();
+	}
+	System.out.println("Report inserted.");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_doinsertreport.png}
+\caption{Screenshot of doInsertReport method}
+\end{figure}
+
+\subsection{doInsertProgram Method}
+
+\begin{lstlisting}[label={lst5b:doinsertprogram}]
+private static void doInsertProgram() throws SQLException {
+	System.out.print("Enter data manually (M) or from file (F): ");
+	String choice = sc.nextLine().toUpperCase();
+	String pn, name, type, sd, dur;
+	
+	if (choice.equals("F")) {
+		System.out.print("Enter file path: ");
+		String filePath = sc.nextLine();
+		try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+			pn = br.readLine();
+			name = br.readLine();
+			type = br.readLine();
+			sd = br.readLine();
+			dur = br.readLine();
+		} catch (IOException e) {
+			System.out.println("Error reading file: " + e.getMessage());
+			return;
+		}
+	} else {
+		System.out.print("ParkName: "); pn = sc.nextLine();
+		System.out.print("ProgramName: "); name = sc.nextLine();
+		System.out.print("Type: "); type = sc.nextLine();
+		System.out.print("StartDate (YYYY-MM-DD): "); sd = sc.nextLine();
+		System.out.print("Duration hours: "); dur = sc.nextLine();
+	}
+	
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_InsertProgram(?,?,?,?,?)}")) {
+		cstmt.setString(1, pn); 
+		cstmt.setString(2, name); 
+		cstmt.setString(3, type); 
+		cstmt.setDate(4, Date.valueOf(sd)); 
+		cstmt.setInt(5, Integer.parseInt(dur));
+		cstmt.execute();
+	}
+	System.out.println("Program inserted.");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_doinsertprogram.png}
+\caption{Screenshot of doInsertProgram method}
+\end{figure}
+
+\section{Retrieval Methods}
+
+\subsection{doGetEmergencyContacts Method}
+
+\begin{lstlisting}[label={lst5b:dogetemergencycontacts}]
+private static void doGetEmergencyContacts() throws SQLException {
+	System.out.print("PersonID: "); 
+	String pid = sc.nextLine();
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_GetEmergencyContacts(?)}")) {
+		cstmt.setString(1, pid);
+		try (ResultSet rs = cstmt.executeQuery()) {
+			while (rs.next()) 
+			    System.out.println(rs.getString(1) + " | " + 
+			                       rs.getString(2) + " | " + 
+			                       rs.getString(3));
+		}
+	}
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_dogetemergencycontacts.png}
+\caption{Screenshot of doGetEmergencyContacts method}
+\end{figure}
+
+\subsection{doGetVisitorsByProgram Method}
+
+\begin{lstlisting}[label={lst5b:dogetvisitorsbyprogram}]
+private static void doGetVisitorsByProgram() throws SQLException {
+	System.out.print("ProgramID: "); 
+	String pidStr = sc.nextLine();
+	int pid = Integer.parseInt(pidStr);
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_GetVisitorsByProgram(?)}")) {
+		cstmt.setInt(1, pid);
+		try (ResultSet rs = cstmt.executeQuery()) {
+			while (rs.next()) 
+			    System.out.println(rs.getString(1) + " | " + 
+			                       rs.getString(2) + " | " + 
+			                       rs.getString(3));
+		}
+	}
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_dogetvisitorsbyprogram.png}
+\caption{Screenshot of doGetVisitorsByProgram method}
+\end{figure}
+
+\subsection{doGetProgramsAfterDate Method}
+
+\begin{lstlisting}[label={lst5b:dogetprogramsafterdate}]
+private static void doGetProgramsAfterDate() throws SQLException {
+	System.out.print("ParkName: "); String pn = sc.nextLine();
+	System.out.print("StartAfter (YYYY-MM-DD): "); String sd = sc.nextLine();
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_GetProgramsAfterDate(?,?)}")) {
+		cstmt.setString(1, pn); 
+		cstmt.setDate(2, Date.valueOf(sd));
+		try (ResultSet rs = cstmt.executeQuery()) {
+			while (rs.next()) 
+			    System.out.println(rs.getInt("ProgramID") + ": " + 
+			                       rs.getString("ProgramName") + " - " + 
+			                       rs.getDate("StartDate"));
+		}
+	}
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_dogetprogramsafterdate.png}
+\caption{Screenshot of doGetProgramsAfterDate method}
+\end{figure}
+
+\subsection{doAnonymousDonationStats Method}
+
+\begin{lstlisting}[label={lst5b:doanonymousdonationstats}]
+private static void doAnonymousDonationStats() throws SQLException {
+	System.out.print("Year: "); int y = Integer.parseInt(sc.nextLine());
+	System.out.print("Month (1-12): "); int m = Integer.parseInt(sc.nextLine());
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_AnonymousDonationStatsByMonth(?,?)}")) {
+		cstmt.setInt(1, y); 
+		cstmt.setInt(2, m);
+		try (ResultSet rs = cstmt.executeQuery()) {
+			while (rs.next()) 
+			    System.out.println(rs.getString("DonorID") + " - Total: " + 
+			                       rs.getBigDecimal("TotalAmount") + " Avg: " + 
+			                       rs.getBigDecimal("AvgAmount") + " Count: " + 
+			                       rs.getInt("NumDonations"));
+		}
+	}
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_doanonymousdonationstats.png}
+\caption{Screenshot of doAnonymousDonationStats method}
+\end{figure}
+
+\subsection{doGetRangersInTeam Method}
+
+\begin{lstlisting}[label={lst5b:dogetrangersinteam}]
+private static void doGetRangersInTeam() throws SQLException {
+	System.out.print("TeamID: "); int tid = Integer.parseInt(sc.nextLine());
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_GetRangersInTeam(?)}")) {
+		cstmt.setInt(1, tid);
+		try (ResultSet rs = cstmt.executeQuery()) {
+			while (rs.next()) 
+			    System.out.println(rs.getString("RangerID") + " - " + 
+			                       rs.getString("FirstName") + " " + 
+			                       rs.getString("LastName") + " Years: " + 
+			                       rs.getInt("YearsOfService") + " Leader: " + 
+			                       rs.getBoolean("IsLeader") + " Cert: " + 
+			                       rs.getString("Certification"));
+		}
+	}
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_dogetrangersinteam.png}
+\caption{Screenshot of doGetRangersInTeam method}
+\end{figure}
+
+\subsection{doGetAllIndividuals Method}
+
+\begin{lstlisting}[label={lst5b:dogetallindividuals}]
+private static void doGetAllIndividuals() throws SQLException {
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_GetAllIndividuals}")) {
+		try (ResultSet rs = cstmt.executeQuery()) {
+			while (rs.next()) 
+			    System.out.println(rs.getString("PersonID") + " - " + 
+			                       rs.getString("FirstName") + " " + 
+			                       rs.getString("LastName") + " Newsletter: " + 
+			                       rs.getBoolean("NewsletterSubscribed"));
+		}
+	}
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_dogetallindividuals.png}
+\caption{Screenshot of doGetAllIndividuals method}
+\end{figure}
+
+\section{Modification Methods}
+
+\subsection{doIncreaseSalary Method}
+
+\begin{lstlisting}[label={lst5b:doincreasesalary}]
+private static void doIncreaseSalary() throws SQLException {
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_IncreaseSalary}")) {
+		cstmt.execute();
+	}
+	System.out.println("Salaries updated where applicable.");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_doincreasesalary.png}
+\caption{Screenshot of doIncreaseSalary method}
+\end{figure}
+
+\subsection{doDeleteInactiveVisitors Method}
+
+\begin{lstlisting}[label={lst5b:dodeleteinactivevisitors}]
+private static void doDeleteInactiveVisitors() throws SQLException {
+	try (CallableStatement cstmt = conn.prepareCall(
+	    "{call sp_DeleteInactiveVisitors}")) {
+		cstmt.execute();
+	}
+	System.out.println("Inactive visitors removed.");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_dodeleteinactivevisitors.png}
+\caption{Screenshot of doDeleteInactiveVisitors method}
+\end{figure}
+
+\section{Import and Export Methods}
+
+\subsection{doImportTeams Method}
+
+This method reads a CSV file and imports ranger teams.
+
+\begin{lstlisting}[label={lst5b:doimportteams}]
+private static void doImportTeams() throws SQLException {
+	System.out.print("Enter CSV file path: "); 
+	String path = sc.nextLine();
+	try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+		String line;
+		while ((line = br.readLine()) != null) {
+			String[] cols = line.split(",");
+			if (cols.length < 3) continue;
+			CallableStatement cstmt = conn.prepareCall(
+			    "{call sp_InsertRangerTeamWithLeader(?,?,?)}");
+			cstmt.setString(1, cols[0]);
+			if (cols[1].isBlank()) 
+			    cstmt.setNull(2, Types.DATE); 
+			else 
+			    cstmt.setDate(2, Date.valueOf(cols[1]));
+			cstmt.setString(3, cols[2]);
+			cstmt.execute(); 
+			cstmt.close();
+		}
+	} catch (Exception e) {
+		System.out.println("Import error: " + e.getMessage());
+	}
+	System.out.println("Import finished.");
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_doimportteams.png}
+\caption{Screenshot of doImportTeams method}
+\end{figure}
+
+\subsection{doExportMailingList Method}
+
+This method exports newsletter subscribers to a CSV file.
+
+\begin{lstlisting}[label={lst5b:doexportmailinglist}]
+private static void doExportMailingList() throws SQLException {
+	System.out.print("Enter output CSV file path: "); 
+	String path = sc.nextLine();
+	try (java.io.PrintWriter pw = new java.io.PrintWriter(path)) {
+		PreparedStatement pst = conn.prepareStatement(
+		    "SELECT p.PersonID, p.FirstName, p.LastName, p.Street, " +
+		    "p.City, p.State, p.PostalCode FROM Person p " +
+		    "WHERE NewsletterSubscribed = 1");
+		ResultSet rs = pst.executeQuery();
+		pw.println("PersonID,FirstName,LastName,Street,City,State,PostalCode");
+		while (rs.next()) {
+			pw.printf("%s,%s,%s,%s,%s,%s,%s\n", 
+			    rs.getString(1), rs.getString(2), rs.getString(3), 
+			    safe(rs.getString(4)), safe(rs.getString(5)), 
+			    safe(rs.getString(6)), safe(rs.getString(7)));
+		}
+		rs.close(); 
+		pst.close();
+	} catch (Exception e) { 
+	    System.out.println("Export error: " + e.getMessage()); 
+	}
+	System.out.println("Export complete.");
+}
+
+private static String safe(String s) {
+	return (s == null) ? "" : s;
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_doexportmailinglist.png}
+\caption{Screenshot of doExportMailingList method}
+\end{figure}
+
+\subsection{exportAllTables Method}
+
+This method exports all database tables to CSV files after modifying operations.
+
+\begin{lstlisting}[label={lst5b:exportalltables}]
+private static void exportAllTables() {
+	try {
+		Files.createDirectories(EXPORT_DIR);
+		for (String table : TABLES) {
+			exportTable(table);
+		}
+		System.out.println("Table export complete. Files saved to " + 
+		                   EXPORT_DIR.toAbsolutePath());
+	} catch (Exception e) {
+		System.out.println("Export error: " + e.getMessage());
+	}
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_exportalltables.png}
+\caption{Screenshot of exportAllTables method}
+\end{figure}
+
+\subsection{exportTable Method}
+
+This helper method exports a single table to CSV format.
+
+\begin{lstlisting}[label={lst5b:exporttable}]
+private static void exportTable(String tableName) 
+        throws SQLException, IOException {
+	String query = "SELECT * FROM dbo." + tableName;
+	try (Statement statement = conn.createStatement();
+	     ResultSet rs = statement.executeQuery(query)) {
+		ResultSetMetaData meta = rs.getMetaData();
+		int columnCount = meta.getColumnCount();
+		Path csvPath = EXPORT_DIR.resolve(tableName.toLowerCase() + ".csv");
+		
+		try (Writer writer = new BufferedWriter(
+		        new OutputStreamWriter(
+		            new FileOutputStream(csvPath.toFile()),
+		            StandardCharsets.UTF_8))) {
+			// Write header
+			for (int i = 1; i <= columnCount; i++) {
+				writer.write(escapeCsv(meta.getColumnLabel(i)));
+				if (i < columnCount) {
+					writer.write(',');
+				}
+			}
+			writer.write(System.lineSeparator());
+			
+			int rowCount = 0;
+			while (rs.next()) {
+				rowCount++;
+				for (int i = 1; i <= columnCount; i++) {
+					Object value = rs.getObject(i);
+					writer.write(escapeCsv(formatValue(value)));
+					if (i < columnCount) {
+						writer.write(',');
+					}
+				}
+				writer.write(System.lineSeparator());
+			}
+			writer.flush();
+			System.out.printf("Exported %-22s -> %s (%d rows)%n",
+			    tableName, csvPath.toString(), rowCount);
+		}
+	}
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_exporttable.png}
+\caption{Screenshot of exportTable method}
+\end{figure}
+
+\subsection{Helper Methods for CSV Export}
+
+\begin{lstlisting}[label={lst5b:csvhelpers}]
+private static String formatValue(Object value) {
+	if (value == null) {
+		return "";
+	}
+	if (value instanceof Date) {
+		return value.toString();
+	}
+	if (value instanceof java.sql.Timestamp) {
+		return TIMESTAMP_FORMAT.format(new java.util.Date(
+		    ((java.sql.Timestamp) value).getTime()));
+	}
+	if (value instanceof java.sql.Time) {
+		return value.toString();
+	}
+	return value.toString();
+}
+
+private static String escapeCsv(String input) {
+	if (input == null) {
+		return "";
+	}
+	boolean needQuotes = input.contains(",")
+	    || input.contains("\"")
+	    || input.contains("\n")
+	    || input.contains("\r");
+	String result = input.replace("\"", "\"\"");
+	if (needQuotes) {
+		result = "\"" + result + "\"";
+	}
+	return result;
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{screenshots/task5b_csvhelpers.png}
+\caption{Screenshot of CSV helper methods}
+\end{figure}
+
+\section{Compilation and Execution}
+
+The Java application was successfully compiled and tested with all stored procedures.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{screenshots/java_proof.png}
+\caption{Screenshot of successful compilation}
+\end{figure}
+
+\section{Summary}
+
+The Java application provides a complete interface to the NPSS database with the following capabilities:
+
+\begin{itemize}
+    \item \textbf{Insert Operations:} All 7 insert stored procedures (visitors, rangers, teams, donations, researchers, reports, programs)
+    \item \textbf{Query Operations:} All 6 retrieval stored procedures (emergency contacts, visitors by program, programs after date, anonymous donation stats, rangers in team, all individuals)
+    \item \textbf{Modification Operations:} 2 procedures that modify data (salary increase, delete inactive visitors)
+    \item \textbf{Import/Export:} CSV import for teams and export for mailing lists
+    \item \textbf{Automatic Table Export:} After each modifying operation, all tables are exported to CSV for documentation
+    \item \textbf{Error Handling:} Comprehensive try-catch blocks and user-friendly error messages
+    \item \textbf{Flexible Input:} Manual entry or file-based input for all insert operations
+\end{itemize}
+
+The application demonstrates proper JDBC usage including:
+\begin{itemize}
+    \item Connection management with properties file
+    \item CallableStatement for stored procedure execution
+    \item PreparedStatement for direct queries
+    \item ResultSet processing with metadata inspection
+    \item Proper resource cleanup with try-with-resources
+    \item CSV parsing and generation with proper escaping
+\end{itemize}
