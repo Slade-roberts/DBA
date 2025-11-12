@@ -1,0 +1,118 @@
+% Roberts_Slade_IP_Report (Overleaf LaTeX skeleton)
+% Replace placeholders with your information and add figures/screenshots into the images/ folder.
+\UseRawInputEncoding
+\documentclass[11pt]{report}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{parskip}
+\usepackage{listings}
+\lstset{
+    inputencoding=utf8, 
+    breaklines=true,
+    basicstyle=\ttfamily\small,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    showstringspaces=false
+}
+\geometry{letterpaper, margin=1in}
+
+% Hyperref setup for better PDF navigation
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    pdftitle={NPSS Individual Project Report},
+    pdfauthor={Slade Roberts},
+    pdfsubject={Database Design and Implementation},
+    pdfkeywords={National Park Service, Database, SQL, Java, Azure}
+}
+
+\title{NPSS Individual Project Report\\
+\large National Park Support System Database}
+\author{Slade Roberts}
+\date{Fall 2025}
+
+\begin{document}
+\sloppy
+\maketitle
+\thispagestyle{empty}
+\clearpage
+
+% Abstract or Executive Summary (optional but recommended)
+\chapter*{Executive Summary}
+\addcontentsline{toc}{chapter}{Executive Summary}
+
+This report documents the design, implementation, and testing of the National Park Support System (NPSS) database. The project encompasses:
+
+\begin{itemize}
+    \item Entity-Relationship modeling of a comprehensive park management system
+    \item Relational database schema design with proper normalization
+    \item SQL DDL implementation in Azure SQL Database
+    \item Fifteen stored procedures for data manipulation and retrieval
+    \item Java JDBC application providing menu-driven database access
+    \item Comprehensive testing and validation of all system components
+\end{itemize}
+
+The NPSS database successfully manages information about visitors, rangers, researchers, park programs, donations, and related entities with full referential integrity and transactional consistency.
+
+\clearpage
+
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+
+% List of Figures (optional but helpful with many screenshots)
+\listoffigures
+\clearpage
+
+% List of Tables (optional)
+\listoftables
+\clearpage
+
+\pagenumbering{arabic}
+
+% Task sections
+\input{sections/task1}
+\clearpage
+
+\input{sections/task2}
+\clearpage
+
+\input{sections/task3}
+\clearpage
+
+\input{sections/task4}
+\clearpage
+
+\input{sections/task5a}
+\clearpage
+
+\input{sections/task5b}
+\clearpage
+
+\input{sections/task6_part1}
+\clearpage
+
+\input{sections/task6_part2}
+\clearpage
+
+\input{sections/task6_part3}
+\clearpage
+
+\input{sections/task6_complete_new}
+
+% Conclusion Chapter
+\chapter{Conclusion and Reflection}
+\label{ch:conclusion}
+
+\section{Project Summary}
+
+This project successfully demonstrated the complete lifecycle of database development from conceptual design through implementation and testing. The NPSS database provides a robust foundation for managing National Park Service operations including:
+\end{document}

@@ -1,0 +1,3 @@
+DonationID,CardType,LastFourDigits,ExpirationDate
+64,Visa,1234,
+66,MasterCard,5678,
